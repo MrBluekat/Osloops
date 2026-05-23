@@ -612,42 +612,23 @@ function xmlText(node, tag) {
 
 
 
-// ─── TRAVEL TIMES — Live DATEX II ────────────────────────────────────────────
+// ─── TRAVEL TIMES — server parses DATEX, returns clean JSON ─────────────────
 async function loadTravelTimes() {
-  el("travel-body").innerHTML = '<div class="loading"><div class="spinner"></div>FETCHING DATEX…</div>';
+  el("travel-body").innerHTML = '<div class="loading"><div class="spinner"></div>HENTER DATEX…</div>';
   try {
-    const xml = await datexFetch("GetTravelTimeData");
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(xml, "text/xml");
-    const measurements = [...doc.querySelectorAll("travelTimeMeasurement,travelTimeData,measuredValue,basicData")];
+    const res  = await fetch("/travel");
+    const data = await res.json();
 
-    // Parse travel time entries — DATEX XML structure varies; handle both v3 patterns
-    const entries = [];
-    doc.querySelectorAll("elaboratedData,travelTimeMeasurement").forEach(node => {
-      const name = xmlText(node, "measurementSiteReference,locationReference,predefinedLocationReference") ||
-                   xmlText(node, "travelTimeType") || "";
-      const secNode = node.querySelector("travelTime,duration,value");
-      const secs = secNode ? parseFloat(secNode.textContent) : null;
-      const freeNode = node.querySelector("freeFlowTravelTime,normallyExpectedTravelTime");
-      const freeSecs = freeNode ? parseFloat(freeNode.textContent) : null;
-      if (secs !== null && !isNaN(secs)) {
-        entries.push({ name, secs, freeSecs });
-      }
-    });
+    if (!data.ok || !data.routes?.length) throw new Error(data.error || "Ingen data");
 
-    if (!entries.length) throw new Error("No travel time data in response");
-
-    el("datex-status").textContent = `✓ DATEX live · ${new Date().toLocaleTimeString("no-NO",{timeZone:"Europe/Oslo",hour:"2-digit",minute:"2-digit"})}`;
-    el("datex-status").style.color = "#39ff14";
-
-    el("travel-body").innerHTML = entries.slice(0, 8).map(r => {
-      const min = Math.round(r.secs / 60);
+    el("travel-body").innerHTML = data.routes.map(r => {
+      const min   = Math.round(r.secs / 60);
       const delay = r.freeSecs ? Math.max(0, Math.round((r.secs - r.freeSecs) / 60)) : 0;
-      const dc = delay === 0 ? "d-ok" : delay <= 3 ? "d-warn" : "d-bad";
+      const dc    = delay === 0 ? "d-ok" : delay <= 3 ? "d-warn" : "d-bad";
       return `<div class="tv-row">
         <div>
-          <div class="tv-name">${r.name || "Strekning"}</div>
-          <div class="tv-via">DATEX II · oppdatert hvert 5. min</div>
+          <div class="tv-name">${r.label || "Strekning"}</div>
+          <div class="tv-via">DATEX II · oppdateres hvert 5. min</div>
         </div>
         <div>
           <div class="tv-min">${min} min</div>
@@ -657,7 +638,7 @@ async function loadTravelTimes() {
     }).join("") + '<div class="pol-src">Kilde: Statens vegvesen DATEX II · NLOD</div>';
 
   } catch(e) {
-    // Fallback to time-aware static data if DATEX not connected
+    // Fallback to time-aware estimates
     const h = parseInt(new Date().toLocaleString("no-NO",{timeZone:"Europe/Oslo",hour:"numeric",hour12:false}));
     const rush = (h>=7&&h<=9)||(h>=15&&h<=17);
     const routes = [
@@ -675,7 +656,7 @@ async function loadTravelTimes() {
           <div class="tv-del ${dc}">${r.delay===0?"+0 min":"+"+r.delay+" min"}</div>
         </div>
       </div>`;
-    }).join("") + `<div class="pol-src" style="color:#ffd700">⚠ Estimert — DATEX: ${e.message}</div>`;
+    }).join("") + `<div class="pol-src" style="color:#ffd700">⚠ Estimert — ${e.message}</div>`;
   }
 }
 
@@ -718,34 +699,29 @@ async function loadCamerasDatex() {
   }
 }
 
-// ─── INCIDENTS — Live DATEX II ────────────────────────────────────────────────
+// ─── INCIDENTS — server parses DATEX, returns clean JSON ────────────────────
 async function loadIncidents() {
-  // Incidents panel — always try on server
   try {
-    const xml = await datexFetch("GetSituation");
-    const doc = new DOMParser().parseFromString(xml, "text/xml");
-    const situations = [...doc.querySelectorAll("situation")];
+    const res  = await fetch("/incidents");
+    const data = await res.json();
 
-    if (!situations.length) return;
+    if (!data.ok || !data.incidents?.length) return; // ingen hendelser — vis ikke panelet
 
-    // Build incidents HTML and append below travel times
-    const items = situations.slice(0, 6).map(s => {
-      const type = xmlText(s, "situationRecordType,trafficElementType,networkManagement") || "Hendelse";
-      const desc = xmlText(s, "comment,generalPublicComment,complianceOption") ||
-                   xmlText(s, "impactOnTraffic,delays") || type;
-      const road = xmlText(s, "roadName,locationDescription,roadNumber") || "";
-      const time = xmlText(s, "situationRecordCreationTime,overallStartTime");
-      const dt   = time ? new Date(time).toLocaleString("no-NO",
+    const items = data.incidents.map(item => {
+      const dt = item.time ? new Date(item.time).toLocaleString("no-NO",
         {timeZone:"Europe/Oslo",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}) : "";
-      const sev  = xmlText(s, "severity,probabilityOfOccurrence") || "";
-      const borderColor = sev.toLowerCase().includes("high") ? "#ff3838" : "#ffd700";
+      const sev = (item.sev||"").toLowerCase();
+      const borderColor = sev.includes("high")||sev.includes("serious") ? "#ff3838" : "#ffd700";
       return `<div class="pol-item" style="border-left:2px solid ${borderColor};background:rgba(255,215,0,.04)">
-        <div class="pol-meta"><span>${dt}</span>${road?`<span class="pol-cat">${road}</span>`:""}</div>
-        <div class="pol-title">${desc}</div>
+        <div class="pol-meta">
+          <span>${dt}</span>
+          ${item.road ? `<span class="pol-cat">${item.road}</span>` : ""}
+        </div>
+        <div class="pol-title">${item.desc}</div>
       </div>`;
     }).join("");
 
-    // Inject incidents panel if it doesn't exist yet
+    // Lag panelet første gang, oppdater deretter
     if (!el("incidents-panel")) {
       const panel = document.createElement("div");
       panel.id = "incidents-panel";
@@ -761,7 +737,9 @@ async function loadIncidents() {
       el("police-panel").insertAdjacentElement("afterend", panel);
     }
     el("incidents-body").innerHTML = items;
-  } catch(e) { /* silent — incidents are bonus */ }
+  } catch(e) {
+    console.warn("Incidents feil:", e.message);
+  }
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
