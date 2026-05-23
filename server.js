@@ -68,6 +68,20 @@ app.get("/datex/:endpoint", async (req, res) => {
   }
 });
 
+// ─── Debug — visit /debug/cameras, /debug/travel, /debug/incidents in browser ─
+app.get("/debug/:name", async (req, res) => {
+  const map = { cameras:"GetCCTVSiteTable", travel:"GetTravelTimeData", incidents:"GetSituation" };
+  const ep  = map[req.params.name];
+  if (!ep) return res.status(400).send("Bruk: cameras, travel, incidents");
+  try {
+    const xml = await datexGet(ep);
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.send(xml.slice(0, 4000)); // first 4000 chars of stripped XML
+  } catch (e) {
+    res.status(502).send("Feil: " + e.message);
+  }
+});
+
 // ─── Travel times ─────────────────────────────────────────────────────────────
 app.get("/travel", async (req, res) => {
   try {
