@@ -116,10 +116,7 @@ app.get("/debug/allroutes", async (req, res) => {
 
     lines.sort((a, b) => a.localeCompare(b, "no"));
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    res.send(`Totalt ${lines.length} unike strekninger:
-
-` + lines.join("
-"));
+    res.send("Totalt " + lines.length + " unike strekninger:\n\n" + lines.join("\n"));
   } catch (e) {
     res.status(502).send("Feil: " + e.message);
   }
