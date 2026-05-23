@@ -626,17 +626,20 @@ async function loadTravelTimes() {
       const delay = r.freeSecs ? Math.max(0, Math.round((r.secs - r.freeSecs) / 60)) : 0;
       const dc    = delay === 0 ? "d-ok" : delay <= 3 ? "d-warn" : "d-bad";
       // Label is "Fra - Til" — split and display with arrow
-      const parts = r.label.split(" - ");
-      const fra   = parts[0] || r.label;
-      const til   = parts[1] || "";
+      const parts   = r.label.split(" - ");
+      const fra     = parts[0] || r.label;
+      const til     = parts[1] || "";
+      const freeMin = r.freeSecs ? Math.round(r.freeSecs / 60) : null;
+      // Only show travel time if there is a delay, otherwise just show "ingen kø"
+      const showMin = delay > 0;
       return `<div class="tv-row">
         <div>
           <div class="tv-name">${fra}${til ? " → " + til : ""}</div>
-          <div class="tv-via">${Math.round(r.secs)} sek strekning · DATEX II live</div>
+          <div class="tv-via">Normal: ${freeMin ?? min} min · DATEX II</div>
         </div>
         <div>
-          <div class="tv-min">${min} min</div>
-          <div class="tv-del ${dc}">${delay === 0 ? "fri flyt" : "+" + delay + " min"}</div>
+          ${showMin ? `<div class="tv-min">${min} min</div>` : ""}
+          <div class="tv-del ${dc}" style="${showMin ? "" : "margin-top:6px"}">${delay === 0 ? "ingen kø" : "+" + delay + " min kø"}</div>
         </div>
       </div>`;
     }).join("") + '<div class="pol-src">Kilde: Statens vegvesen DATEX II · NLOD</div>';

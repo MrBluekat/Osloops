@@ -90,24 +90,38 @@ app.get("/debug/:name", async (req, res) => {
 // ─── Travel times ─────────────────────────────────────────────────────────────
 // Location names are "Fra - Til" format e.g. "Ammerud - Bjerke"
 // Coordinates are UTM32 — not usable for geo-filter, so we filter by name instead
-const OSLO_KEYWORDS = [
-  "oslo","e6","e18","e134","rv4","rv150","rv155","rv159","rv160","rv162","rv163",
-  "ring","ringvei","trondheimsv","mosseveien","drammensveien","sørkedalsv",
-  "maridalsv","kjelsåsv","grefsenveien","sinsen","alnabru","klemetsrud","ryen",
-  "lysaker","sandvika","skullerud","mortensrud","oppsal","manglerud","bryn",
-  "helsfyr","carl berners","storo","nydalen","majorstuen","skøyen","filipstad",
-  "bjørvika","gamlebyen","lodalen","sjursøya","ekeberg","ekebergveien",
-  "grorud","romsås","furuset","ellingsrud","trosterud","haugerud","høybråten",
-  "stovner","vestli","røa","bekkestua","kolsås","rykkinn","bærums","fornebu",
-  "smestad","ullern","montebello","bestum","jar","blommenholm","sandvika",
-  "ammerud","bjerke","berg","gjerdbakken","hvam","karihaugen","strømsveien",
-  "østre aker","veitvet","linderud","refstad","økern","løren","ulven","alnabru",
-  "rv190","e02","rv002","rv003","rv004","rv006","rv107","rv108"
+// Eksakte strekninger vi vil vise — begge retninger (A→B og B→A)
+const OSLO_ROUTES = [
+  // E6 nord/sør
+  ["hvam","manglerud"], ["hvam","ryen"],
+  ["manglerud","hvam"], ["ryen","hvam"],
+  ["klemetsrud","ryen"], ["klemetsrud","operatunnelen"],
+  ["ryen","klemetsrud"], ["operatunnelen","klemetsrud"],
+  ["operatunnelen"],   // enkeltpunkt — match alt med "operatunnelen"
+
+  // E18 vest/øst
+  ["asker","lysaker"], ["lysaker","filipstad"],
+  ["asker","filipstad"],
+  ["filipstad","lysaker"], ["lysaker","asker"],
+  ["filipstad","asker"],
+  ["fiskevollen","mosseveien"], ["fiskevollen","bjørvika"],
+  ["mosseveien","fiskevollen"], ["bjørvika","fiskevollen"],
+
+  // Ring 3 / Rv150
+  ["ryen","granfosstunnelen"], ["granfosstunnelen","ryen"],
+  ["manglerud","sinsen"], ["sinsen","manglerud"],
+  ["bryn","smestad"], ["smestad","bryn"],
+  ["sinsen","ullevål"], ["ullevål","sinsen"],
+  ["ullevål","smestad"], ["smestad","ullevål"],
+
+  // Rv4 / E16
+  ["gjelleråsen","sinsen"], ["sinsen","gjelleråsen"],
+  ["sandvika","skui"], ["skui","sandvika"],
 ];
 
 function isOslo(name) {
   const l = name.toLowerCase();
-  return OSLO_KEYWORDS.some(k => l.includes(k));
+  return OSLO_ROUTES.some(pair => pair.every(kw => l.includes(kw)));
 }
 
 app.get("/travel", async (req, res) => {
