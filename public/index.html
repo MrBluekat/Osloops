@@ -625,14 +625,18 @@ async function loadTravelTimes() {
       const min   = Math.round(r.secs / 60);
       const delay = r.freeSecs ? Math.max(0, Math.round((r.secs - r.freeSecs) / 60)) : 0;
       const dc    = delay === 0 ? "d-ok" : delay <= 3 ? "d-warn" : "d-bad";
+      // Label is "Fra - Til" — split and display with arrow
+      const parts = r.label.split(" - ");
+      const fra   = parts[0] || r.label;
+      const til   = parts[1] || "";
       return `<div class="tv-row">
         <div>
-          <div class="tv-name">${r.label || "Strekning"}</div>
-          <div class="tv-via">DATEX II · oppdateres hvert 5. min</div>
+          <div class="tv-name">${fra}${til ? " → " + til : ""}</div>
+          <div class="tv-via">${Math.round(r.secs)} sek strekning · DATEX II live</div>
         </div>
         <div>
           <div class="tv-min">${min} min</div>
-          <div class="tv-del ${dc}">${delay === 0 ? "+0 min" : "+" + delay + " min"}</div>
+          <div class="tv-del ${dc}">${delay === 0 ? "fri flyt" : "+" + delay + " min"}</div>
         </div>
       </div>`;
     }).join("") + '<div class="pol-src">Kilde: Statens vegvesen DATEX II · NLOD</div>';

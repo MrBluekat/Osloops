@@ -88,67 +88,77 @@ app.get("/debug/:name", async (req, res) => {
 });
 
 // ─── Travel times ─────────────────────────────────────────────────────────────
-// Confirmed structure from live XML:
-//   <physicalQuantity>
-//     <predefinedLocationReference id="100357"/>
-//     <basicData xsi:type="ns10:TravelTimeData">
-//       <travelTime><duration>124.0</duration></travelTime>
-//       <freeFlowTravelTime><duration>150.0</duration></freeFlowTravelTime>
+// Location names are "Fra - Til" format e.g. "Ammerud - Bjerke"
+// Coordinates are UTM32 — not usable for geo-filter, so we filter by name instead
+const OSLO_KEYWORDS = [
+  "oslo","e6","e18","e134","rv4","rv150","rv155","rv159","rv160","rv162","rv163",
+  "ring","ringvei","trondheimsv","mosseveien","drammensveien","sørkedalsv",
+  "maridalsv","kjelsåsv","grefsenveien","sinsen","alnabru","klemetsrud","ryen",
+  "lysaker","sandvika","skullerud","mortensrud","oppsal","manglerud","bryn",
+  "helsfyr","carl berners","storo","nydalen","majorstuen","skøyen","filipstad",
+  "bjørvika","gamlebyen","lodalen","sjursøya","ekeberg","ekebergveien",
+  "grorud","romsås","furuset","ellingsrud","trosterud","haugerud","høybråten",
+  "stovner","vestli","røa","bekkestua","kolsås","rykkinn","bærums","fornebu",
+  "smestad","ullern","montebello","bestum","jar","blommenholm","sandvika",
+  "ammerud","bjerke","berg","gjerdbakken","hvam","karihaugen","strømsveien",
+  "østre aker","veitvet","linderud","refstad","økern","løren","ulven","alnabru",
+  "rv190","e02","rv002","rv003","rv004","rv006","rv107","rv108"
+];
+
+function isOslo(name) {
+  const l = name.toLowerCase();
+  return OSLO_KEYWORDS.some(k => l.includes(k));
+}
+
 app.get("/travel", async (req, res) => {
   try {
     const xml    = await datexGet("GetTravelTimeData");
     let   locXml = "";
     try { locXml = await datexGet("GetPredefinedTravelTimeLocations"); } catch(_) {}
 
-    // Build id → name map from location publication
+    // Build id → name map
+    // Structure: <predefinedLocationReference id="100357">
+    //              <predefinedLocationName><values><value lang="no">Ammerud - Bjerke</value>
     const locMap = {};
-    for (const m of locXml.matchAll(/id="([^"]+)"[^>]*>[\s\S]*?<value[^>]*>([^<]{1,200})<\/value>/gi)) {
-      if (!locMap[m[1]]) locMap[m[1]] = m[2].trim();
-    }
-    // Also try simpler pattern
-    for (const m of locXml.matchAll(/<predefinedLocation[^>]+id="([^"]+)"[\s\S]*?<name[\s\S]*?<value[^>]*>([^<]+)<\/value>/gi)) {
-      if (!locMap[m[1]]) locMap[m[1]] = m[2].trim();
+    for (const m of locXml.matchAll(/<predefinedLocationReference[^>]+id="([^"]+)"[^>]*>([\s\S]*?)<\/predefinedLocationReference>/gi)) {
+      const id   = m[1];
+      const name = m[2].match(/<value[^>]*>([^<]+)<\/value>/i)?.[1]?.trim();
+      if (id && name) locMap[id] = name;
     }
 
     const results = [];
+    const seen    = new Set();
 
-    // Each <physicalQuantity> block may contain TravelTimeData
     const blocks = [...xml.matchAll(/<physicalQuantity[^>]*>([\s\S]*?)<\/physicalQuantity>/gi)];
 
     for (const b of blocks) {
       const block = b[1];
-
-      // Only process TravelTimeData blocks (skip TrafficStatus etc)
       if (!block.includes("TravelTimeData")) continue;
 
-      // Location ID
-      const idM = block.match(/predefinedLocationReference[^>]+id="([^"]+)"/i);
-      const id  = idM ? idM[1] : "";
-      const label = locMap[id] || `Strekning ${id}`;
+      const id    = block.match(/predefinedLocationReference[^>]+id="([^"]+)"/i)?.[1] || "";
+      if (seen.has(id)) continue;
+      seen.add(id);
 
-      // Travel time in seconds — plain float like 124.0
-      const secM  = block.match(/<travelTime[^>]*>\s*<duration[^>]*>([^<]+)<\/duration>/i);
-      const freeM = block.match(/<freeFlowTravelTime[^>]*>\s*<duration[^>]*>([^<]+)<\/duration>/i);
+      const label = locMap[id] || "";
+      if (!label) continue;
 
-      const secs     = secM  ? parseFloat(secM[1])  : null;
-      const freeSecs = freeM ? parseFloat(freeM[1]) : null;
+      // Filter to Oslo area by name
+      if (!isOslo(label)) continue;
 
-      if (secs && !isNaN(secs) && secs > 0 && secs < 7200) {
-        results.push({ label, secs, freeSecs, id });
+      const secs     = parseFloat(block.match(/<travelTime[^>]*>\s*<duration[^>]*>([^<]+)<\/duration>/i)?.[1] || "0");
+      const freeSecs = parseFloat(block.match(/<freeFlowTravelTime[^>]*>\s*<duration[^>]*>([^<]+)<\/duration>/i)?.[1] || "0");
+
+      if (secs > 0 && secs < 7200) {
+        results.push({ label, secs, freeSecs: freeSecs || null, id });
       }
     }
 
-    // Deduplicate by location ID (keep first occurrence)
-    const seen = new Set();
-    const unique = results.filter(r => {
-      if (seen.has(r.id)) return false;
-      seen.add(r.id);
-      return true;
-    });
+    // Sort by label for consistent display
+    results.sort((a, b) => a.label.localeCompare(b.label, "no"));
 
-    console.log(`Travel: ${unique.length} unike strekninger fra ${blocks.length} blokker`);
+    console.log(`Travel: ${results.length} Oslo-strekninger (av ${blocks.length} totalt)`);
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.json({ ok: true, count: unique.length, routes: unique.slice(0, 12) });
+    res.json({ ok: true, count: results.length, routes: results.slice(0, 15) });
   } catch (e) {
     console.error("Travel error:", e.message);
     res.status(502).json({ ok: false, error: e.message, routes: [] });
