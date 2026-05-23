@@ -83,59 +83,67 @@ app.get("/debug/:name", async (req, res) => {
 });
 
 // ─── Travel times ─────────────────────────────────────────────────────────────
+// Confirmed structure from live XML:
+//   <physicalQuantity>
+//     <predefinedLocationReference id="100357"/>
+//     <basicData xsi:type="ns10:TravelTimeData">
+//       <travelTime><duration>124.0</duration></travelTime>
+//       <freeFlowTravelTime><duration>150.0</duration></freeFlowTravelTime>
 app.get("/travel", async (req, res) => {
   try {
     const xml    = await datexGet("GetTravelTimeData");
     let   locXml = "";
     try { locXml = await datexGet("GetPredefinedTravelTimeLocations"); } catch(_) {}
 
-    // Build location name map  id → human label
+    // Build id → name map from location publication
     const locMap = {};
-    const locBlocks = [...locXml.matchAll(/<predefinedLocation[^>]*>([\s\S]*?)<\/predefinedLocation>/gi)];
-    for (const lb of locBlocks) {
-      const idM = lb[0].match(/id="([^"]+)"/);
-      const nm  = getValueTag(lb[1], "name", "description") || getTag(lb[1], "value", "name");
-      if (idM && nm) locMap[idM[1]] = nm;
+    for (const m of locXml.matchAll(/id="([^"]+)"[^>]*>[\s\S]*?<value[^>]*>([^<]{1,200})<\/value>/gi)) {
+      if (!locMap[m[1]]) locMap[m[1]] = m[2].trim();
+    }
+    // Also try simpler pattern
+    for (const m of locXml.matchAll(/<predefinedLocation[^>]+id="([^"]+)"[\s\S]*?<name[\s\S]*?<value[^>]*>([^<]+)<\/value>/gi)) {
+      if (!locMap[m[1]]) locMap[m[1]] = m[2].trim();
     }
 
     const results = [];
-    const blocks  = [...xml.matchAll(/<siteMeasurements[^>]*>([\s\S]*?)<\/siteMeasurements>/gi)];
+
+    // Each <physicalQuantity> block may contain TravelTimeData
+    const blocks = [...xml.matchAll(/<physicalQuantity[^>]*>([\s\S]*?)<\/physicalQuantity>/gi)];
 
     for (const b of blocks) {
       const block = b[1];
 
-      // Location reference
-      const refM  = block.match(/measurementSiteReference[^>]+refId="([^"]+)"/i) ||
-                    block.match(/<measurementSiteReference[^>]*>([^<]+)<\/measurementSiteReference>/i);
-      const ref   = refM ? refM[1] : "";
-      const label = locMap[ref] || ref || "Strekning";
+      // Only process TravelTimeData blocks (skip TrafficStatus etc)
+      if (!block.includes("TravelTimeData")) continue;
 
-      // Travel time — handle ISO 8601 (PT45S) and plain seconds
-      const parseDuration = (str) => {
-        if (!str) return null;
-        str = str.trim();
-        if (str.startsWith("PT")) {
-          const h = (str.match(/(\d+)H/)?.[1] || 0) * 3600;
-          const m = (str.match(/(\d+)M/)?.[1] || 0) * 60;
-          const s = (str.match(/(\d+(?:\.\d+)?)S/)?.[1] || 0) * 1;
-          return h + m + parseFloat(s);
-        }
-        return parseFloat(str);
-      };
+      // Location ID
+      const idM = block.match(/predefinedLocationReference[^>]+id="([^"]+)"/i);
+      const id  = idM ? idM[1] : "";
+      const label = locMap[id] || `Strekning ${id}`;
 
-      const secRaw  = getTag(block, "travelTime", "duration", "value");
-      const freeRaw = getTag(block, "freeFlowTravelTime", "normallyExpectedTravelTime");
-      const secs    = parseDuration(secRaw);
-      const freeSecs= parseDuration(freeRaw);
+      // Travel time in seconds — plain float like 124.0
+      const secM  = block.match(/<travelTime[^>]*>\s*<duration[^>]*>([^<]+)<\/duration>/i);
+      const freeM = block.match(/<freeFlowTravelTime[^>]*>\s*<duration[^>]*>([^<]+)<\/duration>/i);
+
+      const secs     = secM  ? parseFloat(secM[1])  : null;
+      const freeSecs = freeM ? parseFloat(freeM[1]) : null;
 
       if (secs && !isNaN(secs) && secs > 0 && secs < 7200) {
-        results.push({ label, secs, freeSecs });
+        results.push({ label, secs, freeSecs, id });
       }
     }
 
-    console.log(`Travel: ${results.length} ruter fra ${blocks.length} blokker`);
+    // Deduplicate by location ID (keep first occurrence)
+    const seen = new Set();
+    const unique = results.filter(r => {
+      if (seen.has(r.id)) return false;
+      seen.add(r.id);
+      return true;
+    });
+
+    console.log(`Travel: ${unique.length} unike strekninger fra ${blocks.length} blokker`);
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.json({ ok: true, count: results.length, routes: results.slice(0, 10) });
+    res.json({ ok: true, count: unique.length, routes: unique.slice(0, 12) });
   } catch (e) {
     console.error("Travel error:", e.message);
     res.status(502).json({ ok: false, error: e.message, routes: [] });
@@ -177,43 +185,42 @@ app.get("/incidents", async (req, res) => {
 });
 
 // ─── Camera list ──────────────────────────────────────────────────────────────
+// Confirmed DATEX v3.1 structure from live XML:
+//   <cctvCameraMetadataRecord id="3000047_2">
+//     <cctvCameraSiteLocalDescription><values><value>Rundebrua</value>...
+//     <pointByCoordinates><pointCoordinates><latitude>62.37</latitude><longitude>5.62</longitude>
+//     <stillImageUrl><urlLinkAddress>https://kamera.atlas.vegvesen.no/api/images/3000047_2</urlLinkAddress>
 app.get("/cameras", async (req, res) => {
   try {
     const xml     = await datexGet("GetCCTVSiteTable");
     const cameras = [];
 
-    // After namespace stripping, try both common DATEX v3.1 record tags
-    for (const tag of ["cctvSiteRecord", "cctvCamera", "cctvSiteTablePublication"]) {
-      const pattern = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "gi");
-      const matches = [...xml.matchAll(pattern)];
-      if (!matches.length) continue;
+    const records = [...xml.matchAll(/<cctvCameraMetadataRecord[^>]*>([\s\S]*?)<\/cctvCameraMetadataRecord>/gi)];
+    console.log(`Kamera-records totalt: ${records.length}`);
 
-      for (const m of matches) {
-        const block = m[1];
-        const lat   = parseFloat(getTag(block, "latitude", "lat") || "0");
-        const lon   = parseFloat(getTag(block, "longitude", "lon") || "0");
-        const name  = getValueTag(block, "cctvCameraIdentifier", "name", "description") ||
-                      getTag(block, "cctvCameraIdentifier", "value", "name") || "Kamera";
-        const url   = getTag(block, "urlLinkAddress", "stillImageUrl", "urlLink", "imageUrl");
-        const idFromUrl = url.match(/[?&]id=(\d+)/)?.[1];
+    for (const m of records) {
+      const block = m[1];
 
-        if (idFromUrl && lat > 59.7 && lat < 60.2 && lon > 10.3 && lon < 11.0) {
-          cameras.push({ name, lat, lon, url: `/camimg?id=${idFromUrl}` });
-        }
+      // Coordinates
+      const lat = parseFloat(block.match(/<latitude>([^<]+)<\/latitude>/i)?.[1] || "0");
+      const lon = parseFloat(block.match(/<longitude>([^<]+)<\/longitude>/i)?.[1] || "0");
+
+      // Image URL inside <stillImageUrl><urlLinkAddress>
+      const stillBlock = block.match(/<stillImageUrl[^>]*>([\s\S]*?)<\/stillImageUrl>/i)?.[1] || "";
+      const imgUrl     = stillBlock.match(/<urlLinkAddress>([^<]+)<\/urlLinkAddress>/i)?.[1]?.trim() || "";
+
+      // Name from <cctvCameraSiteLocalDescription><values><value>
+      const descBlock = block.match(/<cctvCameraSiteLocalDescription[^>]*>([\s\S]*?)<\/cctvCameraSiteLocalDescription>/i)?.[1] || "";
+      const name      = descBlock.match(/<value[^>]*>([^<]+)<\/value>/i)?.[1]?.trim() ||
+                        block.match(/<cctvCameraIdentification>([^<]+)<\/cctvCameraIdentification>/i)?.[1]?.trim() || "Kamera";
+
+      // Oslo area filter (lat 59.7-60.2, lon 10.3-11.0)
+      if (imgUrl && lat > 59.7 && lat < 60.2 && lon > 10.3 && lon < 11.0) {
+        cameras.push({ name, lat, lon, url: `/camimg?url=${encodeURIComponent(imgUrl)}` });
       }
-      if (cameras.length) break;
     }
 
-    // Log more XML if still empty to help debug
-    if (cameras.length === 0) {
-      // Find first URL in the XML to verify the structure
-      const anyUrl = xml.match(/webkamera\.vegvesen\.no[^"<\s]*/)?.[0] || "ingen URL funnet";
-      console.log(`Ingen kameraer. Første URL i XML: ${anyUrl}`);
-      console.log(`XML-snippet (500 tegn): ${xml.slice(0, 500)}`);
-    } else {
-      console.log(`Kameraer: ${cameras.length} funnet i Oslo-området`);
-    }
-
+    console.log(`Kameraer i Oslo: ${cameras.length}`);
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.json({ ok: true, count: cameras.length, cameras: cameras.slice(0, 9) });
   } catch (e) {
@@ -223,25 +230,31 @@ app.get("/cameras", async (req, res) => {
 });
 
 // ─── Camera image proxy ───────────────────────────────────────────────────────
-// 406-fix: don't send Accept header — let vegvesen return default content type
+// Proxies kamera.atlas.vegvesen.no server-side — browser cannot reach it directly
 app.get("/camimg", async (req, res) => {
-  const { id } = req.query;
-  if (!id || !/^\d+$/.test(id)) return res.status(400).send("Invalid ID");
+  const { url } = req.query;
+  if (!url) return res.status(400).send("Mangler url");
+  const decoded = decodeURIComponent(url);
+  if (!decoded.startsWith("https://kamera.atlas.vegvesen.no") &&
+      !decoded.startsWith("https://webkamera.vegvesen.no")) {
+    return res.status(403).send("Forbudt domene");
+  }
   try {
-    const upstream = await fetch(`https://webkamera.vegvesen.no/public?id=${id}`, {
+    const upstream = await fetch(decoded, {
       headers: {
         Authorization: `Basic ${DATEX_AUTH}`,
         "User-Agent": "Mozilla/5.0 oslo-ops-center/1.0",
+        "Accept": "image/jpeg, image/*",
       },
     });
-    if (!upstream.ok) return res.status(upstream.status).send(`Camera ${upstream.status}`);
+    if (!upstream.ok) return res.status(upstream.status).send(`Kamera ${upstream.status}`);
     const buf = await upstream.arrayBuffer();
     res.setHeader("Content-Type", upstream.headers.get("content-type") || "image/jpeg");
     res.setHeader("Cache-Control", "public, max-age=30");
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.send(Buffer.from(buf));
   } catch (e) {
-    res.status(502).send("Camera fetch failed");
+    res.status(502).send("Kamera-henting feilet");
   }
 });
 

@@ -662,12 +662,12 @@ async function loadTravelTimes() {
 
 // ─── CAMERAS — Live DATEX II (falls back to hardcoded list) ──────────────────
 const FALLBACK_CAMS = [
-  {l:"E6 Ryen",         u:"/camimg?id=531896"},
-  {l:"E18 Lysaker",     u:"/camimg?id=531844"},
-  {l:"Ring 3 Sinsen",   u:"/camimg?id=531833"},
-  {l:"E6 Alnabru",      u:"/camimg?id=531905"},
-  {l:"E18 Hjortnes",    u:"/camimg?id=531840"},
-  {l:"Trondheimsveien", u:"/camimg?id=531850"},
+  {l:"E6 Ryen",         u:"/camimg?url=" + encodeURIComponent("https://kamera.atlas.vegvesen.no/api/images/3000013_1")},
+  {l:"E18 Lysaker",     u:"/camimg?url=" + encodeURIComponent("https://kamera.atlas.vegvesen.no/api/images/3000014_1")},
+  {l:"Ring 3 Sinsen",   u:"/camimg?url=" + encodeURIComponent("https://kamera.atlas.vegvesen.no/api/images/3000015_1")},
+  {l:"E6 Alnabru",      u:"/camimg?url=" + encodeURIComponent("https://kamera.atlas.vegvesen.no/api/images/3000016_1")},
+  {l:"E18 Hjortnes",    u:"/camimg?url=" + encodeURIComponent("https://kamera.atlas.vegvesen.no/api/images/3000017_1")},
+  {l:"Trondheimsveien", u:"/camimg?url=" + encodeURIComponent("https://kamera.atlas.vegvesen.no/api/images/3000018_1")},
 ];
 
 function renderCamGrid(cams) {
