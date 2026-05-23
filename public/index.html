@@ -681,12 +681,12 @@ async function loadTravelTimes() {
 
 // ─── CAMERAS — Live DATEX II (falls back to hardcoded list) ──────────────────
 const FALLBACK_CAMS = [
-  {l:"E6 Ryen",         u:"https://webkamera.vegvesen.no/public?id=531896"},
-  {l:"E18 Lysaker",     u:"https://webkamera.vegvesen.no/public?id=531844"},
-  {l:"Ring 3 Sinsen",   u:"https://webkamera.vegvesen.no/public?id=531833"},
-  {l:"E6 Alnabru",      u:"https://webkamera.vegvesen.no/public?id=531905"},
-  {l:"E18 Hjortnes",    u:"https://webkamera.vegvesen.no/public?id=531840"},
-  {l:"Trondheimsveien", u:"https://webkamera.vegvesen.no/public?id=531850"},
+  {l:"E6 Ryen",         u:"/camimg?id=531896"},
+  {l:"E18 Lysaker",     u:"/camimg?id=531844"},
+  {l:"Ring 3 Sinsen",   u:"/camimg?id=531833"},
+  {l:"E6 Alnabru",      u:"/camimg?id=531905"},
+  {l:"E18 Hjortnes",    u:"/camimg?id=531840"},
+  {l:"Trondheimsveien", u:"/camimg?id=531850"},
 ];
 
 function renderCamGrid(cams) {
@@ -703,27 +703,17 @@ function renderCamGrid(cams) {
 
 async function loadCamerasDatex() {
   try {
-    const xml = await datexFetch("GetCCTVSiteTable");
-    const doc = new DOMParser().parseFromString(xml, "text/xml");
-    const sites = [...doc.querySelectorAll("cctvCameraList cctvCamera,cctvSiteRecord")];
-    if (!sites.length) throw new Error("No cameras in response");
+    // Use the server's /cameras endpoint — returns clean JSON,
+    // and images are served via /camimg proxy (bypasses Vegvesen CORS)
+    const res = await fetch("/cameras");
+    const data = await res.json();
 
-    // Oslo area — filter by coordinates (lat 59.7-60.1, lon 10.4-10.9)
-    const cams = [];
-    sites.forEach(site => {
-      const lat = parseFloat(xmlText(site, "latitude,lat") || "0");
-      const lon = parseFloat(xmlText(site, "longitude,lon") || "0");
-      const url = xmlText(site, "stillImageUrl,urlLinkAddress,urlLink");
-      const name = xmlText(site, "cctvCameraIdentifier,name,description") || "Kamera";
-      if (url && lat > 59.7 && lat < 60.1 && lon > 10.4 && lon < 10.9) {
-        cams.push({ l: name, u: url });
-      }
-    });
+    if (data.error || !data.cameras?.length) throw new Error(data.error || "No cameras");
 
-    if (!cams.length) throw new Error("No Oslo cameras found");
-    renderCamGrid(cams.slice(0, 9));
+    const cams = data.cameras.map(c => ({ l: c.name, u: c.url }));
+    renderCamGrid(cams);
   } catch(e) {
-    // Fallback to hardcoded list
+    console.warn("DATEX cameras failed, using fallback:", e.message);
     renderCamGrid(FALLBACK_CAMS);
   }
 }
