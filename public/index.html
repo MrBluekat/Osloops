@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oslo Ops Center</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#050a0f;color:#c8e0f0;font-family:'Rajdhani','Segoe UI',sans-serif;font-size:15px}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  ::-webkit-scrollbar{width:4px}
+  ::-webkit-scrollbar-track{background:#0d1c2e}
+  ::-webkit-scrollbar-thumb{background:#1a3a5c;border-radius:2px}
+
+  /* HEADER */
+  #header{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;
+    border-bottom:1px solid #1a3a5c;background:rgba(10,21,32,.97);
+    position:sticky;top:0;z-index:200}
+  .logo{font-family:'Share Tech Mono',monospace;font-size:17px;letter-spacing:4px;
+    color:#00c8ff;text-shadow:0 0 14px rgba(0,200,255,.5)}
+  .logo span{color:#4a7a9b;font-weight:400}
+  .meta-row{display:flex;gap:24px;align-items:center}
+  .meta-item{font-family:'Share Tech Mono',monospace;font-size:10px;color:#4a7a9b;
+    text-transform:uppercase;line-height:1.5}
+  .meta-val{color:#00c8ff;display:block;font-size:13px;font-weight:700}
+  .live-dot{width:8px;height:8px;border-radius:50%;background:#39ff14;
+    box-shadow:0 0 8px #39ff14;display:inline-block;margin-right:5px;
+    animation:pulse 2s ease-in-out infinite}
+
+  /* GRID */
+  #grid{display:grid;grid-template-columns:1fr 300px;gap:10px;
+    padding:10px;max-width:1400px;margin:0 auto}
+
+  /* PANEL */
+  .panel{background:#0a1520;border:1px solid #1a3a5c;border-radius:4px;
+    overflow:hidden;position:relative}
+  .panel-glow{position:absolute;top:0;left:0;right:0;height:1px;
+    background:linear-gradient(90deg,transparent,#00c8ff,transparent);opacity:.6;pointer-events:none}
+  .panel-head{padding:8px 14px;border-bottom:1px solid #1a3a5c;display:flex;
+    align-items:center;justify-content:space-between;background:#0d1c2e}
+  .panel-title{font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:3px;
+    text-transform:uppercase;color:#00c8ff}
+  .panel-actions{display:flex;gap:8px;align-items:center}
+  .badge{font-family:'Share Tech Mono',monospace;font-size:10px;padding:2px 7px;
+    border-radius:2px;letter-spacing:1px}
+  .badge-green{background:rgba(57,255,20,.12);color:#39ff14;border:1px solid rgba(57,255,20,.3)}
+  .badge-blue{background:rgba(0,200,255,.12);color:#00c8ff;border:1px solid rgba(0,200,255,.3)}
+  .badge-orange{background:rgba(255,107,53,.12);color:#ff6b35;border:1px solid rgba(255,107,53,.3)}
+  .badge-purple{background:rgba(199,125,255,.12);color:#c77dff;border:1px solid rgba(199,125,255,.3)}
+  .badge-dim{background:rgba(74,122,155,.12);color:#4a7a9b;border:1px solid rgba(74,122,155,.3)}
+  .btn{background:rgba(0,200,255,.1);border:1px solid rgba(0,200,255,.3);color:#00c8ff;
+    font-family:'Share Tech Mono',monospace;font-size:10px;padding:3px 9px;
+    cursor:pointer;border-radius:2px}
+  .btn:hover{background:rgba(0,200,255,.2)}
+
+  /* SPINNER */
+  .loading{padding:20px;text-align:center;color:#4a7a9b;font-family:'Share Tech Mono',monospace;font-size:11px}
+  .spinner{width:18px;height:18px;border:2px solid #1a3a5c;border-top-color:#00c8ff;
+    border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 10px}
+  .err-text{color:#ff3838}
+
+  /* MAP */
+  #map-panel{grid-column:1;grid-row:1/3}
+  #map-key-bar{background:#0d1c2e;border-bottom:1px solid #1a3a5c;padding:8px 12px;
+    display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  #map-key-bar input{flex:1;min-width:200px;background:#050a0f;border:1px solid #1a3a5c;
+    color:#c8e0f0;padding:4px 8px;font-family:'Share Tech Mono',monospace;font-size:11px;
+    border-radius:2px;outline:none}
+  #map-key-bar a{color:#4a7a9b;font-family:'Share Tech Mono',monospace;font-size:10px;text-decoration:none}
+  #map-key-hint{font-family:'Share Tech Mono',monospace;font-size:10px;color:#4a7a9b}
+  #map-key-hint span{color:#ffd700}
+  #gmap{width:100%;height:462px;background:#0d1c2e}
+  #map-nokey{height:462px;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:10px;background:#0d1c2e}
+  #map-nokey p{font-family:'Share Tech Mono',monospace;font-size:11px;color:#4a7a9b;
+    text-align:center;line-height:1.8}
+  #map-nokey a{color:#00c8ff;font-family:'Share Tech Mono',monospace;font-size:10px;text-decoration:none}
+
+  /* DEPARTURES */
+  #dep-panel{grid-column:2;grid-row:1}
+  .dep-row{display:grid;grid-template-columns:32px 1fr 52px;gap:8px;align-items:center;
+    padding:9px 10px;border-bottom:1px solid rgba(26,58,92,.5);transition:background .15s}
+  .dep-row:last-child{border-bottom:none}
+  .dep-row:hover{background:rgba(0,200,255,.04)}
+  .line-badge{width:30px;height:30px;border-radius:4px;display:flex;align-items:center;
+    justify-content:center;font-family:'Share Tech Mono',monospace;font-size:11px;font-weight:700}
+  .dep-dest{font-weight:600;font-size:13px;color:#c8e0f0;white-space:nowrap;
+    overflow:hidden;text-overflow:ellipsis}
+  .dep-type{font-family:'Share Tech Mono',monospace;font-size:10px;color:#4a7a9b;margin-top:2px}
+  .dep-min{font-family:'Share Tech Mono',monospace;font-size:12px;font-weight:700;text-align:right}
+  .dep-clk{font-family:'Share Tech Mono',monospace;font-size:10px;color:#4a7a9b;
+    text-align:right;margin-top:2px}
+  .t-now{color:#39ff14;text-shadow:0 0 8px #39ff14}
+  .t-soon{color:#ffd700}
+  .t-later{color:#4a7a9b}
+
+  /* SIDEBAR STACK */
+  #sidebar{grid-column:2;grid-row:2;display:flex;flex-direction:column;gap:10px}
+
+  /* WEATHER */
+  .w-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#1a3a5c;
+    margin:8px;border-radius:3px;overflow:hidden}
+  .w-cell{background:#0a1520;padding:10px 8px;text-align:center}
+  .w-icon{font-size:22px;margin-bottom:3px}
+  .w-val{font-family:'Share Tech Mono',monospace;font-size:15px;font-weight:700}
+  .w-lbl{font-family:'Share Tech Mono',monospace;font-size:10px;color:#4a7a9b;
+    margin-top:3px;letter-spacing:1px}
+
+  /* AIR QUALITY */
+  .aq-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#1a3a5c;
+    margin:8px;border-radius:3px;overflow:hidden}
+  .aq-cell{background:#0a1520;padding:9px 8px;text-align:center}
+  .aq-val{font-family:'Share Tech Mono',monospace;font-size:16px;font-weight:700}
+  .aq-name{font-family:'Share Tech Mono',monospace;font-size:10px;color:#4a7a9b;
+    margin:2px 0;letter-spacing:1px}
+  .aq-lbl{font-family:'Share Tech Mono',monospace;font-size:9px}
+  .aq-src{padding:2px 10px 8px;font-family:'Share Tech Mono',monospace;font-size:9px;color:#4a7a9b}
+
+  /* CAMERAS */
+  #cam-panel{grid-column:1;grid-row:3}
+  .cam-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:8px}
+  .cam-card{background:#010810;border:1px solid #1a3a5c;border-radius:3px;
+    overflow:hidden;cursor:pointer;transition:border-color .2s,transform .2s}
+  .cam-card:hover{border-color:#00c8ff;transform:scale(1.02)}
+  .cam-wrap{aspect-ratio:16/10;background:#010810;position:relative;overflow:hidden}
+  .cam-wrap img{width:100%;height:100%;object-fit:cover;display:block;
+    filter:saturate(.7) contrast(1.1)}
+  .cam-err{display:flex;flex-direction:column;align-items:center;justify-content:center;
+    height:100%;color:#4a7a9b;font-family:'Share Tech Mono',monospace;font-size:9px;
+    gap:3px;padding:6px;text-align:center}
+  .cam-rec{position:absolute;top:4px;left:4px;font-family:'Share Tech Mono',monospace;
+    font-size:8px;color:#39ff14;background:rgba(0,0,0,.6);padding:1px 4px;border-radius:1px}
+  .cam-lbl{padding:4px 6px;font-family:'Share Tech Mono',monospace;font-size:10px;
+    color:#4a7a9b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* TRAVEL TIMES */
+  #travel-panel{grid-column:2;grid-row:3}
+  .tv-row{display:flex;justify-content:space-between;align-items:center;
+    padding:9px 14px;border-bottom:1px solid rgba(26,58,92,.4)}
+  .tv-row:last-child{border-bottom:none}
+  .tv-name{font-size:13px;font-weight:600;color:#c8e0f0}
+  .tv-via{font-family:'Share Tech Mono',monospace;font-size:10px;color:#4a7a9b;margin-top:2px}
+  .tv-min{font-family:'Share Tech Mono',monospace;font-size:15px;font-weight:700;color:#00c8ff;text-align:right}
+  .tv-del{font-family:'Share Tech Mono',monospace;font-size:10px;text-align:right;margin-top:2px}
+  .d-ok{color:#39ff14} .d-warn{color:#ffd700} .d-bad{color:#ff3838}
+
+  /* POLICE */
+  #police-panel{grid-column:1/-1;grid-row:4}
+  .pol-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+    gap:8px;padding:10px}
+  .pol-item{border-radius:0 3px 3px 0;padding:8px 10px}
+  .pol-meta{font-family:'Share Tech Mono',monospace;font-size:10px;color:#4a7a9b;
+    margin-bottom:4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .pol-cat{background:rgba(199,125,255,.15);color:#c77dff;padding:1px 5px;
+    border-radius:2px;font-size:9px}
+  .pol-title{font-size:13px;line-height:1.4;color:#c8e0f0}
+  .pol-src{padding:0 10px 8px;font-family:'Share Tech Mono',monospace;font-size:9px;color:#4a7a9b}
+
+  @media(max-width:900px){
+    #grid{grid-template-columns:1fr}
+    #map-panel,#dep-panel,#sidebar,#cam-panel,#travel-panel,#police-panel{
+      grid-column:1!important;grid-row:auto!important}
+    .cam-grid{grid-template-columns:repeat(2,1fr)}
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="header">
+  <div class="logo">OSLO <span>OPS</span> CENTER</div>
+  <div class="meta-row">
+    <div class="meta-item"><strong class="meta-val" id="clock">--:--:--</strong>LOCAL TIME</div>
+    <div class="meta-item"><strong class="meta-val">OSLO, NO</strong>59.94°N 10.67°E</div>
+    <div class="meta-item"><span class="live-dot"></span><strong class="meta-val">LIVE</strong>MONITORING</div>
+  </div>
+</div>
+
+<div id="grid">
+
+  <!-- MAP -->
+  <div class="panel" id="map-panel">
+    <div class="panel-glow"></div>
+    <div class="panel-head">
+      <span class="panel-title">▣ TRAFFIC MAP — OSLO</span>
+      <div class="panel-actions">
+        <button class="btn" onclick="toggleMapKey()">⚙ API KEY</button>
+        <span class="badge badge-orange" id="map-badge">NO KEY</span>
+      </div>
+    </div>
+    <div id="map-key-bar" style="display:none">
+      <input id="gm-key-input" type="text" placeholder="Paste Google Maps API key…">
+      <button class="btn" onclick="saveMapKey()">SAVE</button>
+      <a href="https://console.cloud.google.com/google/maps-apis/credentials" target="_blank">Get free key ↗</a>
+      <span id="map-key-hint">Enable: <span>Maps JavaScript API</span></span>
+    </div>
+    <div id="gmap"></div>
+    <div id="map-nokey">
+      <div style="font-size:32px">🗺️</div>
+      <p>No Google Maps key set<br><span style="color:#ffd700">Click ⚙ API KEY above</span><br>
+      <span style="font-size:10px">Enable "Maps JavaScript API" in Google Cloud Console</span></p>
+      <a href="https://console.cloud.google.com/google/maps-apis/credentials" target="_blank">console.cloud.google.com ↗</a>
+    </div>
+  </div>
+
+  <!-- DEPARTURES -->
+  <div class="panel" id="dep-panel">
+    <div class="panel-glow"></div>
+    <div class="panel-head">
+      <span class="panel-title" id="dep-title">⟳ MAKRELLBEKKEN DEPARTURES</span>
+      <div class="panel-actions">
+        <button class="btn" onclick="loadDepartures()">↻</button>
+        <span class="badge badge-green">ENTUR LIVE</span>
+      </div>
+    </div>
+    <div id="dep-body"><div class="loading"><div class="spinner"></div>FETCHING…</div></div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <!-- WEATHER -->
+    <div class="panel">
+      <div class="panel-glow"></div>
+      <div class="panel-head">
+        <span class="panel-title">◈ WEATHER — OSLO</span>
+        <span class="badge badge-blue">MET.NO</span>
+      </div>
+      <div id="weather-body"><div class="loading"><div class="spinner"></div>LOADING…</div></div>
+    </div>
+    <!-- AIR QUALITY -->
+    <div class="panel">
+      <div class="panel-glow"></div>
+      <div class="panel-head">
+        <span class="panel-title">◎ AIR QUALITY — OSLO</span>
+        <span class="badge badge-blue">OPEN-METEO</span>
+      </div>
+      <div id="aq-body"><div class="loading"><div class="spinner"></div>LOADING…</div></div>
+    </div>
+  </div>
+
+  <!-- CAMERAS -->
+  <div class="panel" id="cam-panel">
+    <div class="panel-glow"></div>
+    <div class="panel-head">
+      <span class="panel-title">◉ TRAFFIC CAMERAS — OSLO</span>
+      <span class="badge badge-blue">VEGVESEN</span>
+    </div>
+    <div class="cam-grid" id="cam-grid"></div>
+  </div>
+
+  <!-- TRAVEL TIMES -->
+  <div class="panel" id="travel-panel">
+    <div class="panel-glow"></div>
+    <div class="panel-head">
+      <span class="panel-title">⏱ TRAVEL TIMES</span>
+      <span class="badge badge-blue">VEGVESEN</span>
+    </div>
+    <div id="travel-body"><div class="loading"><div class="spinner"></div>LOADING…</div></div>
+  </div>
+
+  <!-- POLICE -->
+  <div class="panel" id="police-panel">
+    <div class="panel-glow"></div>
+    <div class="panel-head">
+      <span class="panel-title">⚠ OSLO POLITILOGGEN</span>
+      <div class="panel-actions">
+        <button class="btn" onclick="loadPolice()">↻</button>
+        <span class="badge badge-purple">POLITIET RSS</span>
+      </div>
+    </div>
+    <div id="police-body"><div class="loading"><div class="spinner"></div>FETCHING…</div></div>
+  </div>
+
+</div><!-- /grid -->
+
+<script>
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+function el(id){ return document.getElementById(id); }
+
+function parseJSONSafe(text) {
+  const s = Math.min(
+    text.indexOf("{") < 0 ? Infinity : text.indexOf("{"),
+    text.indexOf("[") < 0 ? Infinity : text.indexOf("[")
+  );
+  const e = Math.max(text.lastIndexOf("}"), text.lastIndexOf("]"));
+  if (s === Infinity || e < 0) throw new Error("No JSON in response");
+  return JSON.parse(text.slice(s, e + 1));
+}
+
+// ─── CLOCK ────────────────────────────────────────────────────────────────────
+function updateClock() {
+  el("clock").textContent = new Date().toLocaleTimeString("no-NO", { timeZone:"Europe/Oslo", hour12:false });
+}
+setInterval(updateClock, 1000); updateClock();
+
+// ─── GOOGLE MAPS ──────────────────────────────────────────────────────────────
+let gmapInstance = null;
+
+function toggleMapKey() {
+  const bar = el("map-key-bar");
+  bar.style.display = bar.style.display === "none" ? "flex" : "none";
+  if (bar.style.display === "flex") {
+    el("gm-key-input").value = localStorage.getItem("gm_key") || "";
+    el("gm-key-input").focus();
+  }
+}
+
+function saveMapKey() {
+  const key = el("gm-key-input").value.trim();
+  if (!key) return;
+  localStorage.setItem("gm_key", key);
+  el("map-key-bar").style.display = "none";
+  loadGoogleMap(key);
+}
+
+function loadGoogleMap(key) {
+  // Remove old script if any
+  const old = document.getElementById("gm-script");
+  if (old) old.remove();
+  if (gmapInstance) { gmapInstance = null; }
+
+  el("gmap").style.display = "block";
+  el("map-nokey").style.display = "none";
+  el("map-badge").textContent = "LOADING…";
+  el("map-badge").className = "badge badge-blue";
+
+  window.__gmCallback = function() {
+    const mapDiv = el("gmap");
+    const map = new google.maps.Map(mapDiv, {
+      center: { lat: 59.9139, lng: 10.7522 },
+      zoom: 13,
+      mapTypeId: "roadmap",
+      styles: [
+        {elementType:"geometry",          stylers:[{color:"#1a2332"}]},
+        {elementType:"labels.text.fill",  stylers:[{color:"#8ec3b9"}]},
+        {elementType:"labels.text.stroke",stylers:[{color:"#1a3646"}]},
+        {featureType:"road",elementType:"geometry",           stylers:[{color:"#304a5e"}]},
+        {featureType:"road",elementType:"geometry.stroke",    stylers:[{color:"#255763"}]},
+        {featureType:"road.highway",elementType:"geometry",   stylers:[{color:"#2c6675"}]},
+        {featureType:"road.highway",elementType:"geometry.stroke",stylers:[{color:"#255763"}]},
+        {featureType:"water",elementType:"geometry",          stylers:[{color:"#0d1c2e"}]},
+        {featureType:"poi",                                   stylers:[{visibility:"off"}]},
+        {featureType:"transit",                               stylers:[{visibility:"simplified"}]},
+      ],
+      streetViewControl: false,
+      mapTypeControl: false,
+      fullscreenControl: true,
+    });
+    gmapInstance = map;
+
+    // Live traffic layer
+    new google.maps.TrafficLayer().setMap(map);
+
+    // Makrellbekken marker
+    new google.maps.Marker({
+      position: { lat: 59.9422, lng: 10.6736 },
+      map,
+      title: "Makrellbekken T-bane",
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 8,
+        fillColor: "#e8000d",
+        fillOpacity: 1,
+        strokeColor: "#ffffff",
+        strokeWeight: 2,
+      },
+    });
+
+    el("map-badge").textContent = "GOOGLE MAPS LIVE";
+    el("map-badge").className = "badge badge-orange";
+  };
+
+  const sc = document.createElement("script");
+  sc.id = "gm-script";
+  sc.src = `https://maps.googleapis.com/maps/api/js?key=${key}&callback=__gmCallback`;
+  sc.async = true; sc.defer = true;
+  sc.onerror = function() {
+    el("map-badge").textContent = "KEY ERROR";
+    el("map-badge").className = "badge badge-dim";
+    el("gmap").innerHTML = '<div class="loading"><span class="err-text">⚠ Google Maps failed — check your key and that Maps JavaScript API is enabled</span></div>';
+  };
+  document.head.appendChild(sc);
+}
+
+// Init map on load if key exists
+const savedKey = localStorage.getItem("gm_key");
+if (savedKey) {
+  loadGoogleMap(savedKey);
+} else {
+  el("gmap").style.display = "none";
+  el("map-nokey").style.display = "flex";
+}
+
+// ─── ENTUR DEPARTURES ─────────────────────────────────────────────────────────
+let cachedStopId = null;
+
+async function getStopId() {
+  if (cachedStopId) return cachedStopId;
+  const res = await fetch(
+    "https://api.entur.io/geocoder/v1/autocomplete?text=Makrellbekken&size=10&lang=no",
+    { headers: { "ET-Client-Name": "oslo-ops-center" } }
+  );
+  const data = await res.json();
+  const hit = (data.features || []).find(f =>
+    f.properties?.id?.startsWith("NSR:StopPlace") &&
+    f.properties?.name?.toLowerCase().includes("makrellbekk")
+  );
+  if (!hit) throw new Error("Could not find Makrellbekken in Entur geocoder");
+  cachedStopId = hit.properties.id;
+  return cachedStopId;
+}
+
+async function loadDepartures() {
+  el("dep-body").innerHTML = '<div class="loading"><div class="spinner"></div>FETCHING LIVE DATA…</div>';
+  try {
+    const stopId = await getStopId();
+    const query = `{ stopPlace(id:"${stopId}") { name estimatedCalls(timeRange:7200,numberOfDepartures:10) {
+      realtime aimedDepartureTime expectedDepartureTime
+      destinationDisplay{frontText} serviceJourney{line{publicCode transportMode}}
+    }}}`;
+    const res = await fetch("https://api.entur.io/journey-planner/v3/graphql", {
+      method: "POST",
+      headers: { "Content-Type":"application/json", "ET-Client-Name":"oslo-ops-center" },
+      body: JSON.stringify({ query })
+    });
+    const data = await res.json();
+    const calls = data?.data?.stopPlace?.estimatedCalls;
+    const name  = data?.data?.stopPlace?.name || "Makrellbekken";
+    el("dep-title").textContent = `⟳ ${name.toUpperCase()} DEPARTURES`;
+    if (!calls?.length) {
+      el("dep-body").innerHTML = '<div class="loading" style="color:#ffd700">NO DEPARTURES FOUND</div>';
+      return;
+    }
+    const modeColor = {metro:"#e8000d",tram:"#005b99",rail:"#5a2d82",bus:"#006b3c"};
+    const modeLabel = {metro:"T-bane",tram:"Trikk",rail:"Tog",bus:"Buss"};
+    const now = new Date();
+    el("dep-body").innerHTML = calls.map((c,i) => {
+      const dep = new Date(c.expectedDepartureTime || c.aimedDepartureTime);
+      const mn  = Math.round((dep - now) / 60000);
+      const tc  = mn <= 1 ? "t-now" : mn <= 5 ? "t-soon" : "t-later";
+      const txt = mn < 0 ? "AVG" : mn <= 1 ? "NÅ" : `${mn} min`;
+      const clk = dep.toLocaleTimeString("no-NO",{hour:"2-digit",minute:"2-digit",timeZone:"Europe/Oslo"});
+      const bg  = modeColor[c.serviceJourney?.line?.transportMode] || "#006b3c";
+      const code= c.serviceJourney?.line?.publicCode || "?";
+      const mode= c.serviceJourney?.line?.transportMode || "bus";
+      const dest= c.destinationDisplay?.frontText || "—";
+      const rt  = c.realtime;
+      return `<div class="dep-row">
+        <div class="line-badge" style="background:${bg};color:#fff">${code}</div>
+        <div>
+          <div class="dep-dest">${dest}</div>
+          <div class="dep-type">${modeLabel[mode]||mode} · ${rt?"● LIVE":"○ SCHED"}</div>
+        </div>
+        <div>
+          <div class="dep-min ${tc}">${txt}</div>
+          <div class="dep-clk">${clk}</div>
+        </div>
+      </div>`;
+    }).join("");
+  } catch(e) {
+    el("dep-body").innerHTML = `<div class="loading"><span class="err-text">⚠ ${e.message}</span></div>`;
+  }
+}
+
+// ─── MET.NO WEATHER ───────────────────────────────────────────────────────────
+async function loadWeather() {
+  try {
+    const res = await fetch(
+      "https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=59.9139&lon=10.7522",
+      { headers: { "User-Agent":"oslo-ops-center/1.0" } }
+    );
+    const data = await res.json();
+    const ts   = data.properties.timeseries[0].data;
+    const temp = ts.instant.details.air_temperature;
+    const wind = ts.instant.details.wind_speed;
+    const hum  = ts.instant.details.relative_humidity;
+    const pres = ts.instant.details.air_pressure_at_sea_level;
+    const sym  = ts.next_1_hours?.summary?.symbol_code || "";
+    const ICONS= {clearsky:"☀️",fair:"🌤️",partlycloudy:"⛅",cloudy:"☁️",rain:"🌧️",
+                  heavyrain:"⛈️",snow:"❄️",fog:"🌫️",lightrain:"🌦️",sleet:"🌨️"};
+    const ico  = ICONS[Object.keys(ICONS).find(k=>sym.includes(k))] || "🌡️";
+    const tc   = temp<0?"#00c8ff":temp<10?"#74b9ff":temp<20?"#ffd700":"#ff6b35";
+    el("weather-body").innerHTML = `<div class="w-grid">
+      <div class="w-cell"><div class="w-icon">${ico}</div>
+        <div class="w-val" style="color:${tc}">${temp.toFixed(1)}°C</div>
+        <div class="w-lbl">TEMP</div></div>
+      <div class="w-cell"><div class="w-icon">💨</div>
+        <div class="w-val" style="color:#74b9ff">${wind.toFixed(1)} m/s</div>
+        <div class="w-lbl">WIND</div></div>
+      <div class="w-cell"><div class="w-icon">💧</div>
+        <div class="w-val" style="color:#00c8ff">${Math.round(hum)}%</div>
+        <div class="w-lbl">HUMIDITY</div></div>
+      <div class="w-cell"><div class="w-icon">🔽</div>
+        <div class="w-val" style="color:#00c8ff;font-size:13px">${Math.round(pres)} hPa</div>
+        <div class="w-lbl">PRESSURE</div></div>
+    </div>`;
+  } catch(e) {
+    el("weather-body").innerHTML = `<div class="loading err-text">⚠ ${e.message}</div>`;
+  }
+}
+
+// ─── AIR QUALITY — Open-Meteo (free, no key, CORS-open) ──────────────────────
+// Uses Copernicus CAMS data via open-meteo.com — replaces NILU which has no CORS
+let aqCache = null, aqCacheTs = 0;
+async function loadAirQuality() {
+  if (aqCache && Date.now() - aqCacheTs < 600000) { renderAQ(aqCache); return; }
+  try {
+    // current=true returns the most recent hourly value as "current" fields
+    const url = "https://air-quality-api.open-meteo.com/v1/air-quality" +
+      "?latitude=59.9139&longitude=10.7522" +
+      "&current=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,ozone,european_aqi";
+    const res  = await fetch(url);
+    const json = await res.json();
+    const cur  = json.current;
+    if (!cur) throw new Error("No current data in response");
+
+    // European AQI scale: 0-20 Good, 20-40 Fair, 40-60 Moderate, 60-80 Poor, 80+ Very Poor
+    function aqiLabel(aqi) {
+      if (aqi <= 20) return { label: "Svært god",    color: "#39ff14" };
+      if (aqi <= 40) return { label: "God",          color: "#74ff74" };
+      if (aqi <= 60) return { label: "Moderat",      color: "#ffd700" };
+      if (aqi <= 80) return { label: "Dårlig",       color: "#ff9a00" };
+      return             { label: "Svært dårlig",    color: "#ff3838" };
+    }
+
+    const eaqi = cur.european_aqi;
+    const aq   = aqiLabel(eaqi);
+
+    const components = [
+      { name: "AQI",  value: eaqi,                   unit: "",        color: aq.color,   label: aq.label },
+      { name: "NO₂",  value: cur.nitrogen_dioxide,   unit: "μg/m³",  color: aqiLabel(cur.nitrogen_dioxide  > 200 ? 90 : cur.nitrogen_dioxide  > 100 ? 70 : cur.nitrogen_dioxide  > 50 ? 50 : cur.nitrogen_dioxide  > 25 ? 30 : 10).color, label: "" },
+      { name: "PM10", value: cur.pm10,                unit: "μg/m³",  color: aqiLabel(cur.pm10  > 150 ? 90 : cur.pm10  > 75 ? 70 : cur.pm10  > 50 ? 50 : cur.pm10  > 25 ? 30 : 10).color,  label: "" },
+      { name: "PM2.5",value: cur.pm2_5,               unit: "μg/m³",  color: aqiLabel(cur.pm2_5 > 75  ? 90 : cur.pm2_5 > 35 ? 70 : cur.pm2_5 > 25 ? 50 : cur.pm2_5 > 10 ? 30 : 10).color, label: "" },
+      { name: "O₃",   value: cur.ozone,               unit: "μg/m³",  color: aqiLabel(cur.ozone > 240 ? 90 : cur.ozone > 180 ? 70 : cur.ozone > 120 ? 50 : cur.ozone > 60 ? 30 : 10).color, label: "" },
+      { name: "CO",   value: (cur.carbon_monoxide/1000).toFixed(2), unit: "mg/m³", color: "#74b9ff", label: "" },
+    ];
+
+    aqCache = components; aqCacheTs = Date.now();
+    renderAQ(components);
+  } catch(e) {
+    el("aq-body").innerHTML = `<div class="loading err-text">⚠ ${e.message}</div>`;
+  }
+}
+function renderAQ(data) {
+  el("aq-body").innerHTML = `<div class="aq-grid">${
+    data.map(s => `<div class="aq-cell">
+      <div class="aq-val" style="color:${s.color}">${typeof s.value === "number" ? s.value.toFixed(s.name==="AQI"?0:1) : s.value}</div>
+      <div class="aq-name">${s.name}${s.unit ? " " + s.unit : ""}</div>
+      <div class="aq-lbl" style="color:${s.color}">${s.label || "&nbsp;"}</div>
+    </div>`).join("")
+  }</div><div class="aq-src">Source: Open-Meteo · Copernicus CAMS · No key needed</div>`;
+}
+
+// ─── POLICE RSS ───────────────────────────────────────────────────────────────
+async function loadPolice() {
+  el("police-body").innerHTML = '<div class="loading"><div class="spinner"></div>FETCHING…</div>';
+  try {
+    const res = await fetch("https://www.politiet.no/api/rss/nyheter?distrikt=oslo");
+    const txt = await res.text();
+    const items = [...txt.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0,10).map(m => {
+      const b = m[1];
+      const tag = t => {
+        const r = b.match(new RegExp(`<${t}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${t}>`))||
+                  b.match(new RegExp(`<${t}[^>]*>([\\s\\S]*?)<\\/${t}>`));
+        return r ? r[1].trim() : "";
+      };
+      return { title:tag("title"), date:tag("pubDate"), cat:tag("category") };
+    });
+    if (!items.length) throw new Error("No items in RSS");
+    const cs = c => {
+      const l=(c||"").toLowerCase();
+      if(l.includes("trafikk")||l.includes("ulykke")) return "border-left:2px solid #ffd700;background:rgba(255,215,0,.05)";
+      if(l.includes("brann")) return "border-left:2px solid #ff3838;background:rgba(255,56,56,.05)";
+      if(l.includes("vold")||l.includes("ran")) return "border-left:2px solid #ff6b35;background:rgba(255,107,53,.05)";
+      return "border-left:2px solid #c77dff;background:rgba(199,125,255,.04)";
+    };
+    el("police-body").innerHTML = `<div class="pol-grid">${
+      items.map(item => {
+        const dt = item.date ? new Date(item.date).toLocaleString("no-NO",
+          {timeZone:"Europe/Oslo",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}) : "";
+        return `<div class="pol-item" style="${cs(item.cat||item.title)}">
+          <div class="pol-meta">
+            <span>${dt}</span>
+            ${item.cat?`<span class="pol-cat">${item.cat}</span>`:""}
+          </div>
+          <div class="pol-title">${item.title||"(no title)"}</div>
+        </div>`;
+      }).join("")
+    }</div><div class="pol-src">Data: politiet.no · Lisens: NLOD</div>`;
+  } catch(e) {
+    el("police-body").innerHTML = `<div class="loading err-text">⚠ ${e.message}</div>`;
+  }
+}
+
+// ─── DATEX II — server handles credentials via .env ──────────────────────────
+const PROXY = "/datex";  // proxied by server.js
+
+async function datexFetch(endpoint) {
+  // On the server, credentials are stored in .env — no auth needed from browser
+  const res = await fetch(`${PROXY}/${endpoint}`);
+  if (res.status === 401) throw new Error("DATEX credentials wrong — check server .env file");
+  if (!res.ok) throw new Error(`DATEX HTTP ${res.status}`);
+  return res.text();
+}
+
+function xmlText(node, tag) {
+  const el = node.querySelector(tag);
+  return el ? el.textContent.trim() : "";
+}
+
+
+
+// ─── TRAVEL TIMES — Live DATEX II ────────────────────────────────────────────
+async function loadTravelTimes() {
+  el("travel-body").innerHTML = '<div class="loading"><div class="spinner"></div>FETCHING DATEX…</div>';
+  try {
+    const xml = await datexFetch("GetTravelTimeData");
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xml, "text/xml");
+    const measurements = [...doc.querySelectorAll("travelTimeMeasurement,travelTimeData,measuredValue,basicData")];
+
+    // Parse travel time entries — DATEX XML structure varies; handle both v3 patterns
+    const entries = [];
+    doc.querySelectorAll("elaboratedData,travelTimeMeasurement").forEach(node => {
+      const name = xmlText(node, "measurementSiteReference,locationReference,predefinedLocationReference") ||
+                   xmlText(node, "travelTimeType") || "";
+      const secNode = node.querySelector("travelTime,duration,value");
+      const secs = secNode ? parseFloat(secNode.textContent) : null;
+      const freeNode = node.querySelector("freeFlowTravelTime,normallyExpectedTravelTime");
+      const freeSecs = freeNode ? parseFloat(freeNode.textContent) : null;
+      if (secs !== null && !isNaN(secs)) {
+        entries.push({ name, secs, freeSecs });
+      }
+    });
+
+    if (!entries.length) throw new Error("No travel time data in response");
+
+    el("datex-status").textContent = `✓ DATEX live · ${new Date().toLocaleTimeString("no-NO",{timeZone:"Europe/Oslo",hour:"2-digit",minute:"2-digit"})}`;
+    el("datex-status").style.color = "#39ff14";
+
+    el("travel-body").innerHTML = entries.slice(0, 8).map(r => {
+      const min = Math.round(r.secs / 60);
+      const delay = r.freeSecs ? Math.max(0, Math.round((r.secs - r.freeSecs) / 60)) : 0;
+      const dc = delay === 0 ? "d-ok" : delay <= 3 ? "d-warn" : "d-bad";
+      return `<div class="tv-row">
+        <div>
+          <div class="tv-name">${r.name || "Strekning"}</div>
+          <div class="tv-via">DATEX II · oppdatert hvert 5. min</div>
+        </div>
+        <div>
+          <div class="tv-min">${min} min</div>
+          <div class="tv-del ${dc}">${delay === 0 ? "+0 min" : "+" + delay + " min"}</div>
+        </div>
+      </div>`;
+    }).join("") + '<div class="pol-src">Kilde: Statens vegvesen DATEX II · NLOD</div>';
+
+  } catch(e) {
+    // Fallback to time-aware static data if DATEX not connected
+    const h = parseInt(new Date().toLocaleString("no-NO",{timeZone:"Europe/Oslo",hour:"numeric",hour12:false}));
+    const rush = (h>=7&&h<=9)||(h>=15&&h<=17);
+    const routes = [
+      {name:"E18 Vestgående",  via:"Filipstad → Lysaker",       min:14, delay:rush?8:0},
+      {name:"E6 Nordover",     via:"Klemetsrud → Alnabru",      min:22, delay:rush?12:2},
+      {name:"Ring 1",          via:"Trondheimsveien → Sentrum", min:8,  delay:rush?5:1},
+      {name:"Mosseveien S",    via:"Sjursøya → Ekebergveien",   min:11, delay:rush?3:0},
+    ];
+    el("travel-body").innerHTML = routes.map(r => {
+      const dc = r.delay===0?"d-ok":r.delay<=4?"d-warn":"d-bad";
+      return `<div class="tv-row">
+        <div><div class="tv-name">${r.name}</div><div class="tv-via">${r.via}</div></div>
+        <div>
+          <div class="tv-min">${r.min} min</div>
+          <div class="tv-del ${dc}">${r.delay===0?"+0 min":"+"+r.delay+" min"}</div>
+        </div>
+      </div>`;
+    }).join("") + `<div class="pol-src" style="color:#ffd700">⚠ Estimert — DATEX: ${e.message}</div>`;
+  }
+}
+
+// ─── CAMERAS — Live DATEX II (falls back to hardcoded list) ──────────────────
+const FALLBACK_CAMS = [
+  {l:"E6 Ryen",         u:"https://webkamera.vegvesen.no/public?id=531896"},
+  {l:"E18 Lysaker",     u:"https://webkamera.vegvesen.no/public?id=531844"},
+  {l:"Ring 3 Sinsen",   u:"https://webkamera.vegvesen.no/public?id=531833"},
+  {l:"E6 Alnabru",      u:"https://webkamera.vegvesen.no/public?id=531905"},
+  {l:"E18 Hjortnes",    u:"https://webkamera.vegvesen.no/public?id=531840"},
+  {l:"Trondheimsveien", u:"https://webkamera.vegvesen.no/public?id=531850"},
+];
+
+function renderCamGrid(cams) {
+  el("cam-grid").innerHTML = cams.map(c => `
+    <div class="cam-card" onclick="window.open('${c.u}','_blank')">
+      <div class="cam-wrap">
+        <img src="${c.u}" alt="${c.l}"
+          onerror="this.parentElement.innerHTML='<div class=\\'cam-err\\'><span style=\\'font-size:20px\\'>📷</span><span>${c.l}</span></div>'">
+        <span class="cam-rec">● REC</span>
+      </div>
+      <div class="cam-lbl">${c.l}</div>
+    </div>`).join("");
+}
+
+async function loadCamerasDatex() {
+  try {
+    const xml = await datexFetch("GetCCTVSiteTable");
+    const doc = new DOMParser().parseFromString(xml, "text/xml");
+    const sites = [...doc.querySelectorAll("cctvCameraList cctvCamera,cctvSiteRecord")];
+    if (!sites.length) throw new Error("No cameras in response");
+
+    // Oslo area — filter by coordinates (lat 59.7-60.1, lon 10.4-10.9)
+    const cams = [];
+    sites.forEach(site => {
+      const lat = parseFloat(xmlText(site, "latitude,lat") || "0");
+      const lon = parseFloat(xmlText(site, "longitude,lon") || "0");
+      const url = xmlText(site, "stillImageUrl,urlLinkAddress,urlLink");
+      const name = xmlText(site, "cctvCameraIdentifier,name,description") || "Kamera";
+      if (url && lat > 59.7 && lat < 60.1 && lon > 10.4 && lon < 10.9) {
+        cams.push({ l: name, u: url });
+      }
+    });
+
+    if (!cams.length) throw new Error("No Oslo cameras found");
+    renderCamGrid(cams.slice(0, 9));
+  } catch(e) {
+    // Fallback to hardcoded list
+    renderCamGrid(FALLBACK_CAMS);
+  }
+}
+
+// ─── INCIDENTS — Live DATEX II ────────────────────────────────────────────────
+async function loadIncidents() {
+  // Incidents panel — always try on server
+  try {
+    const xml = await datexFetch("GetSituation");
+    const doc = new DOMParser().parseFromString(xml, "text/xml");
+    const situations = [...doc.querySelectorAll("situation")];
+
+    if (!situations.length) return;
+
+    // Build incidents HTML and append below travel times
+    const items = situations.slice(0, 6).map(s => {
+      const type = xmlText(s, "situationRecordType,trafficElementType,networkManagement") || "Hendelse";
+      const desc = xmlText(s, "comment,generalPublicComment,complianceOption") ||
+                   xmlText(s, "impactOnTraffic,delays") || type;
+      const road = xmlText(s, "roadName,locationDescription,roadNumber") || "";
+      const time = xmlText(s, "situationRecordCreationTime,overallStartTime");
+      const dt   = time ? new Date(time).toLocaleString("no-NO",
+        {timeZone:"Europe/Oslo",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}) : "";
+      const sev  = xmlText(s, "severity,probabilityOfOccurrence") || "";
+      const borderColor = sev.toLowerCase().includes("high") ? "#ff3838" : "#ffd700";
+      return `<div class="pol-item" style="border-left:2px solid ${borderColor};background:rgba(255,215,0,.04)">
+        <div class="pol-meta"><span>${dt}</span>${road?`<span class="pol-cat">${road}</span>`:""}</div>
+        <div class="pol-title">${desc}</div>
+      </div>`;
+    }).join("");
+
+    // Inject incidents panel if it doesn't exist yet
+    if (!el("incidents-panel")) {
+      const panel = document.createElement("div");
+      panel.id = "incidents-panel";
+      panel.className = "panel";
+      panel.style.cssText = "grid-column:1/-1;margin:0 10px 10px";
+      panel.innerHTML = `<div class="panel-glow"></div>
+        <div class="panel-head">
+          <span class="panel-title">🚧 VEGVESEN HENDELSER — LIVE</span>
+          <span class="badge badge-orange">DATEX II</span>
+        </div>
+        <div class="pol-grid" id="incidents-body"></div>
+        <div class="pol-src">Kilde: Statens vegvesen DATEX II · NLOD</div>`;
+      el("police-panel").insertAdjacentElement("afterend", panel);
+    }
+    el("incidents-body").innerHTML = items;
+  } catch(e) { /* silent — incidents are bonus */ }
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+loadDepartures();
+loadWeather();
+loadAirQuality();
+loadPolice();
+loadTravelTimes();
+loadCamerasDatex();
+
+loadIncidents();
+
+setInterval(loadDepartures,   60000);
+setInterval(loadWeather,     300000);
+setInterval(loadAirQuality,  600000);
+setInterval(loadPolice,      180000);
+setInterval(loadTravelTimes, 300000);   // DATEX updates every 5 min
+setInterval(loadIncidents,   300000);
+</script>
+</body>
+</html>
