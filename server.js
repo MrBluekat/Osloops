@@ -114,7 +114,7 @@ app.get("/debug/cameravideo", async (req, res) => {
       const lon  = parseFloat(block.match(/<longitude>([^<]+)<\/longitude>/i)?.[1] || "0");
 
       // Oslo area only
-      if (!(lat > 59.7 && lat < 60.2 && lon > 10.3 && lon < 11.0)) continue;
+      if (!(lat > 59.5 && lat < 60.3 && lon > 10.1 && lon < 11.2)) continue;
 
       const id    = m[0].match(/id="([^"]+)"/)?.[1] || "?";
       const descB = block.match(/<cctvCameraSiteLocalDescription[^>]*>([\s\S]*?)<\/cctvCameraSiteLocalDescription>/i)?.[1] || "";
@@ -313,14 +313,14 @@ app.get("/cameras", async (req, res) => {
                         block.match(/<cctvCameraIdentification>([^<]+)<\/cctvCameraIdentification>/i)?.[1]?.trim() || "Kamera";
 
       // Oslo area filter (lat 59.7-60.2, lon 10.3-11.0)
-      if (imgUrl && lat > 59.7 && lat < 60.2 && lon > 10.3 && lon < 11.0) {
+      if (imgUrl && lat > 59.5 && lat < 60.3 && lon > 10.1 && lon < 11.2) {
         cameras.push({ name, lat, lon, url: `/camimg?url=${encodeURIComponent(imgUrl)}` });
       }
     }
 
     console.log(`Kameraer i Oslo: ${cameras.length}`);
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.json({ ok: true, count: cameras.length, cameras: cameras.slice(0, 9) });
+    res.json({ ok: true, count: cameras.length, cameras: cameras.slice(0, 20) });
   } catch (e) {
     console.error("Camera error:", e.message);
     res.status(502).json({ ok: false, error: e.message, cameras: [] });
@@ -415,7 +415,7 @@ app.get("/camerasfull", async (req, res) => {
       const block = m[1];
       const lat   = parseFloat(block.match(/<latitude>([^<]+)<\/latitude>/i)?.[1] || "0");
       const lon   = parseFloat(block.match(/<longitude>([^<]+)<\/longitude>/i)?.[1] || "0");
-      if (!(lat > 59.7 && lat < 60.2 && lon > 10.3 && lon < 11.0)) continue;
+      if (!(lat > 59.5 && lat < 60.3 && lon > 10.1 && lon < 11.2)) continue;
 
       const descB  = block.match(/<cctvCameraSiteLocalDescription[^>]*>([\s\S]*?)<\/cctvCameraSiteLocalDescription>/i)?.[1] || "";
       const name   = descB.match(/<value[^>]*>([^<]+)<\/value>/i)?.[1]?.trim() || "Kamera";
@@ -437,7 +437,7 @@ app.get("/camerasfull", async (req, res) => {
     }
 
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.json({ ok: true, count: cameras.length, cameras: cameras.slice(0, 12) });
+    res.json({ ok: true, count: cameras.length, cameras: cameras.slice(0, 20) });
   } catch (e) {
     res.status(502).json({ ok: false, error: e.message, cameras: [] });
   }
