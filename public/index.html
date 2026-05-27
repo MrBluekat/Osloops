@@ -712,18 +712,11 @@ async function loadPolice() {
   el("police-body").innerHTML = '<div class="loading"><div class="spinner"></div>FETCHING…</div>';
   try {
     // Fetch via server proxy to avoid CORS
-    const res = await fetch("/api/politiloggen");
-    const txt = await res.text();
-    const items = [...txt.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0,10).map(m => {
-      const b = m[1];
-      const tag = t => {
-        const r = b.match(new RegExp(`<${t}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${t}>`))||
-                  b.match(new RegExp(`<${t}[^>]*>([\\s\\S]*?)<\\/${t}>`));
-        return r ? r[1].trim() : "";
-      };
-      return { title:tag("title"), date:tag("pubDate"), cat:tag("category") };
-    });
-    if (!items.length) throw new Error("No items in RSS");
+    const res  = await fetch("/api/politiloggen");
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "API feil");
+    const items = data.items.slice(0, 5);
+    if (!items.length) throw new Error("Ingen meldinger");
     const cs = c => {
       const l=(c||"").toLowerCase();
       if(l.includes("trafikk")||l.includes("ulykke")) return "border-left:2px solid #ffe000;background:rgba(255,224,0,.04)";
@@ -735,10 +728,10 @@ async function loadPolice() {
       items.map(item => {
         const dt = item.date ? new Date(item.date).toLocaleString("no-NO",
           {timeZone:"Europe/Oslo",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}) : "";
-        return `<div class="pol-item" style="${cs(item.cat||item.title)}">
+        return `<div class="pol-item" style="${cs(item.category||item.title)}">
           <div class="pol-meta">
             <span>${dt}</span>
-            ${item.cat?`<span class="pol-cat">${item.cat}</span>`:""}
+            ${item.category?`<span class="pol-cat">${item.category}</span>`:""}
           </div>
           <div class="pol-title">${item.title||"(no title)"}</div>
         </div>`;
