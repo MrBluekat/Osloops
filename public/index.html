@@ -358,9 +358,6 @@
       </div>
       <div id="police-body"><div class="loading"><div class="spinner"></div>FETCHING…</div></div>
     </div>
-    <!-- incidents injected here by JS -->
-    <div id="incidents-wrapper"></div>
-
     <!-- VG NYHETER -->
     <div class="panel" id="vg-panel">
       <div class="panel-glow"></div>
@@ -378,7 +375,7 @@
     <div class="panel" id="amb-panel">
       <div class="panel-glow"></div>
       <div class="panel-head">
-        <span class="panel-title">🚨 NEWS ALERT — AMERIKAS AMBASSADE</span>
+        <span class="panel-title">🚨 <span style="color:#ff3838;text-shadow:0 0 8px rgba(255,56,56,.6)">NEWS ALERT</span> — AMERIKAS AMBASSADE</span>
         <div class="panel-actions">
           <button class="btn" onclick="loadAmbassade()">↻</button>
           <span class="badge" style="background:rgba(255,56,56,.15);color:#ff3838;border:1px solid rgba(255,56,56,.3)">ALERT</span>
@@ -386,6 +383,9 @@
       </div>
       <div id="amb-body"><div class="loading"><div class="spinner"></div>SØKER…</div></div>
     </div>
+
+    <!-- VEGVESEN HENDELSER — injected last by JS -->
+    <div id="incidents-wrapper"></div>
   </div>
 
   <!-- RIGHT COLUMN: departures → travel → weather → AQ (stacked, no gaps) -->
