@@ -712,7 +712,7 @@ async function loadPolice() {
   el("police-body").innerHTML = '<div class="loading"><div class="spinner"></div>FETCHING…</div>';
   try {
     // Fetch via server proxy to avoid CORS
-    const res = await fetch("/rss/politiloggen");
+    const res = await fetch("/api/politiloggen");
     const txt = await res.text();
     const items = [...txt.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0,10).map(m => {
       const b = m[1];
