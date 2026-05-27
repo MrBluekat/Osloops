@@ -139,7 +139,6 @@ app.get("/debug/cameravideo", async (req, res) => {
     const videoCount = lines.filter(l => l.startsWith("\u2713")).length;
     const imgCount   = lines.filter(l => l.startsWith("\u2717")).length;
     res.send("Oslo-kameraer med videofeed:\n" + sep + "\n" + lines.join("\n") + "\n\nTotalt: " + lines.length + " kameraer (" + videoCount + " med video, " + imgCount + " kun bilde)");
-    );
   } catch (e) {
     res.status(502).send("Feil: " + e.message);
   }
