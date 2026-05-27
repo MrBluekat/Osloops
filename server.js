@@ -570,7 +570,7 @@ app.get("/api/vgnyheter", async (req, res) => {
 // ─── Dagbladet RSS ────────────────────────────────────────────────────────────
 app.get("/api/dagbladet", async (req, res) => {
   try {
-    const upstream = await fetch("https://www.dagbladet.no/feed/rss", {
+    const upstream = await fetch("https://www.dagbladet.no/rss", {
       headers: { "User-Agent": "oslo-ops-center/1.0", "Accept": "application/rss+xml, text/xml" }
     });
     if (!upstream.ok) throw new Error("Dagbladet svarte " + upstream.status);
@@ -586,7 +586,7 @@ app.get("/api/dagbladet", async (req, res) => {
 // ─── TV2 RSS ──────────────────────────────────────────────────────────────────
 app.get("/api/tv2", async (req, res) => {
   try {
-    const upstream = await fetch("https://www.tv2.no/rss", {
+    const upstream = await fetch("https://www.tv2.no/rss/nyheter", {
       headers: { "User-Agent": "oslo-ops-center/1.0", "Accept": "application/rss+xml, text/xml" }
     });
     if (!upstream.ok) throw new Error("TV2 svarte " + upstream.status);
@@ -611,8 +611,8 @@ const NEWS_FEEDS = [
   "https://vg.no/rss/feed/?format=rss",
   "https://www.aftenposten.no/rss",
   "https://www.nrk.no/toppsaker.rss",
-  "https://www.dagbladet.no/feed/rss",
-  "https://www.tv2.no/rss",
+  "https://www.dagbladet.no/rss",
+  "https://www.tv2.no/rss/nyheter",
   "https://www.nettavisen.no/rss.xml",
 ];
 
