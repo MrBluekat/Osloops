@@ -477,11 +477,18 @@ app.get("/api/politiloggen", async (req, res) => {
       const messages  = pageProps?.messages || pageProps?.initialMessages ||
                         pageProps?.dehydratedState?.queries?.[0]?.state?.data?.pages?.[0]?.messages || [];
       if (messages.length) {
-        const items = messages.slice(0, 10).map(m => ({
-          title:    m.title || m.header || m.message || "(ingen tittel)",
-          date:     m.publishedAt || m.createdAt || m.updatedAt || "",
-          category: m.category || m.tema || "",
-        }));
+        const items = messages.slice(0, 10).map(m => {
+          const id  = m.id || m.slug || "";
+          const url = id
+            ? "https://www.politiet.no/politiloggen/hendelse/" + id
+            : "https://www.politiet.no/politiloggen?distrikt=oslo";
+          return {
+            title:    m.title || m.header || m.message || "(ingen tittel)",
+            date:     m.publishedAt || m.createdAt || m.updatedAt || "",
+            category: m.category || m.tema || "",
+            url,
+          };
+        });
         console.log("Politiloggen Next.js data: " + items.length + " meldinger");
         res.setHeader("Access-Control-Allow-Origin", "*");
         return res.json({ ok: true, items });
@@ -500,7 +507,7 @@ app.get("/api/politiloggen", async (req, res) => {
       const timeM = text.match(/(\d{1,2}:\d{2})/);
       const catM  = title.match(/^([^:,]+):/);
       if (title.length > 5) {
-        items.push({ title, date: timeM ? timeM[1] : "", category: catM ? catM[1].trim() : "" });
+        items.push({ title, date: timeM ? timeM[1] : "", category: catM ? catM[1].trim() : "", url: "https://www.politiet.no/politiloggen?distrikt=oslo" });
       }
     }
 

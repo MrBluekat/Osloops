@@ -271,7 +271,8 @@
   #police-panel{grid-column:1/-1;grid-row:3}
   .pol-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
     gap:8px;padding:10px}
-  .pol-item{border-radius:0 2px 2px 0;padding:8px 10px}
+  .pol-item{border-radius:0 2px 2px 0;padding:8px 10px;transition:filter .15s;cursor:pointer}
+  .pol-item:hover{filter:brightness(1.5)}
   .pol-meta{font-size:9px;color:var(--g3);margin-bottom:4px;
     display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .pol-cat{background:rgba(0,255,65,.1);color:var(--g2);padding:1px 5px;
@@ -728,7 +729,7 @@ async function loadPolice() {
       items.map(item => {
         const dt = item.date ? new Date(item.date).toLocaleString("no-NO",
           {timeZone:"Europe/Oslo",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}) : "";
-        return `<div class="pol-item" style="${cs(item.category||item.title)}">
+        return `<div class="pol-item" style="cursor:pointer;${cs(item.category||item.title)}" onclick="window.open('${item.url || "https://www.politiet.no/politiloggen?distrikt=oslo"}','_blank')">
           <div class="pol-meta">
             <span>${dt}</span>
             ${item.category?`<span class="pol-cat">${item.category}</span>`:""}
