@@ -165,8 +165,11 @@
   }
   .cam-section-label span{color:var(--g);text-shadow:var(--glow)}
   /* Single unified grid for both live and still — all same size */
-  .cam-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;padding:0 8px 8px}
-  .cam-grid-live{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;padding:0 8px 4px}
+  .cam-grid,.cam-grid-live{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
+    gap:8px;padding:0 8px 8px;
+  }
   .cam-card{background:#000;border:1px solid var(--g3);border-radius:2px;
     overflow:hidden;cursor:pointer;transition:border-color .2s,transform .2s}
   .cam-card:hover{border-color:var(--g);transform:scale(1.02);box-shadow:var(--glow)}
@@ -174,11 +177,18 @@
     overflow:hidden;cursor:pointer;transition:border-color .2s,transform .2s;
     box-shadow:0 0 8px rgba(255,56,56,.2)}
   .cam-card-live:hover{border-color:#ff6060;transform:scale(1.02);box-shadow:0 0 16px rgba(255,56,56,.4)}
-  .cam-wrap{aspect-ratio:16/10;background:#000;position:relative;overflow:hidden;line-height:0}
-  .cam-wrap img{width:100%;height:100%;object-fit:cover;display:block;
-    filter:saturate(.5) contrast(1.2) brightness(.9)}
-  .cam-wrap video{width:100%;height:100%;object-fit:cover;display:block;
-    filter:saturate(.6) contrast(1.15);line-height:0}
+  .cam-wrap{
+    width:100%;aspect-ratio:16/10;background:#000;
+    position:relative;overflow:hidden;display:block;
+    /* prevent any extra space from inline/block elements */
+    font-size:0;line-height:0;
+  }
+  .cam-wrap img,.cam-wrap video{
+    position:absolute;top:0;left:0;
+    width:100%;height:100%;
+    object-fit:cover;display:block;
+    filter:saturate(.55) contrast(1.15) brightness(.9);
+  }
   .cam-err{display:flex;flex-direction:column;align-items:center;justify-content:center;
     height:100%;color:var(--g3);font-size:9px;gap:3px;padding:6px;text-align:center}
   .cam-rec{position:absolute;top:4px;left:4px;font-size:8px;color:#ff3838;
