@@ -1063,7 +1063,7 @@ async function loadVG() {
     el("vg-body").innerHTML = data.items.map(item => {
       const dt = item.date ? new Date(item.date).toLocaleString("no-NO",
         {timeZone:"Europe/Oslo",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}) : "";
-      return '<div class="pol-item" style="border-left:2px solid #ff6b35;background:rgba(255,107,53,.04);cursor:pointer" onclick="window.open('' + (item.url||"https://vg.no") + '','_blank')">' +
+      return '<div class="pol-item" style="border-left:2px solid #ff6b35;background:rgba(255,107,53,.04);cursor:pointer" onclick="window.open(\'' + (item.url||"https://vg.no").replace(/'/g,"%27") + '\',\'_blank\')">' +
         '<div class="pol-meta"><span>' + dt + '</span></div>' +
         '<div class="pol-title">' + item.title + '</div></div>';
     }).join("") + '<div class="pol-src">Kilde: VG.no · Oppdateres hvert 5. min</div>';
@@ -1086,7 +1086,7 @@ async function loadAmbassade() {
     el("amb-body").innerHTML = data.items.map(item => {
       const dt = item.date ? new Date(item.date).toLocaleString("no-NO",
         {timeZone:"Europe/Oslo",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}) : "";
-      return '<div class="pol-item" style="border-left:2px solid #ff3838;background:rgba(255,56,56,.05);cursor:pointer" onclick="window.open('' + (item.url||"#") + '','_blank')">' +
+      return '<div class="pol-item" style="border-left:2px solid #ff3838;background:rgba(255,56,56,.05);cursor:pointer" onclick="window.open(\'' + (item.url||"#").replace(/'/g,"%27") + '\',\'_blank\')">' +
         '<div class="pol-meta"><span>' + dt + '</span>' +
         (item.source ? '<span class="pol-cat">' + item.source + '</span>' : '') + '</div>' +
         '<div class="pol-title">' + item.title + '</div></div>';
