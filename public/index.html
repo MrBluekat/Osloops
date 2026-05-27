@@ -358,15 +358,28 @@
       </div>
       <div id="police-body"><div class="loading"><div class="spinner"></div>FETCHING…</div></div>
     </div>
-    <!-- VG NYHETER -->
+    <!-- NYHETER med tabs -->
     <div class="panel" id="vg-panel">
       <div class="panel-glow"></div>
       <div class="panel-head">
-        <span class="panel-title">📰 VG — SISTE NYHETER</span>
+        <span class="panel-title">📰 NYHETER</span>
         <div class="panel-actions">
-          <button class="btn" onclick="loadVG()">↻</button>
-          <span class="badge badge-orange">VG.NO</span>
+          <button class="btn" onclick="refreshNews()">↻</button>
         </div>
+      </div>
+      <div style="display:flex;gap:0;border-bottom:1px solid var(--g3);background:var(--g4)">
+        <button id="tab-vg" onclick="switchTab('vg')"
+          style="flex:1;padding:6px;font-family:'Share Tech Mono',monospace;font-size:10px;
+          background:var(--g5);border:none;border-right:1px solid var(--g3);
+          border-bottom:2px solid var(--g);color:var(--g);cursor:pointer;letter-spacing:1px">VG</button>
+        <button id="tab-db" onclick="switchTab('db')"
+          style="flex:1;padding:6px;font-family:'Share Tech Mono',monospace;font-size:10px;
+          background:var(--g4);border:none;border-right:1px solid var(--g3);
+          border-bottom:2px solid transparent;color:var(--g3);cursor:pointer;letter-spacing:1px">DAGBLADET</button>
+        <button id="tab-tv2" onclick="switchTab('tv2')"
+          style="flex:1;padding:6px;font-family:'Share Tech Mono',monospace;font-size:10px;
+          background:var(--g4);border:none;
+          border-bottom:2px solid transparent;color:var(--g3);cursor:pointer;letter-spacing:1px">TV 2</button>
       </div>
       <div id="vg-body"><div class="loading"><div class="spinner"></div>HENTER…</div></div>
     </div>
@@ -1053,23 +1066,73 @@ async function loadIncidents() {
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
-// ─── VG NYHETER ──────────────────────────────────────────────────────────────
-async function loadVG() {
-  el("vg-body").innerHTML = '<div class="loading"><div class="spinner"></div>HENTER VG…</div>';
+// ─── NYHETER MED TABS ────────────────────────────────────────────────────────
+let activeTab = "vg";
+const newsCache = { vg: null, db: null, tv2: null };
+const newsEndpoints = {
+  vg:  { url: "/api/vgnyheter",  label: "VG.no",       color: "#ff6b35" },
+  db:  { url: "/api/dagbladet",  label: "Dagbladet.no", color: "#e63946" },
+  tv2: { url: "/api/tv2",        label: "TV2.no",       color: "#0077cc" },
+};
+
+function switchTab(tab) {
+  activeTab = tab;
+  // Update tab styles
+  ["vg","db","tv2"].forEach(t => {
+    const btn = el("tab-" + t);
+    if (!btn) return;
+    if (t === tab) {
+      btn.style.background = "var(--g5)";
+      btn.style.borderBottom = "2px solid var(--g)";
+      btn.style.color = "var(--g)";
+    } else {
+      btn.style.background = "var(--g4)";
+      btn.style.borderBottom = "2px solid transparent";
+      btn.style.color = "var(--g3)";
+    }
+  });
+  // Show cached or fetch
+  if (newsCache[tab]) {
+    renderNews(tab, newsCache[tab]);
+  } else {
+    fetchNews(tab);
+  }
+}
+
+async function fetchNews(tab) {
+  el("vg-body").innerHTML = '<div class="loading"><div class="spinner"></div>HENTER…</div>';
   try {
-    const res  = await fetch("/api/vgnyheter");
+    const res  = await fetch(newsEndpoints[tab].url);
     const data = await res.json();
     if (!data.ok || !data.items.length) throw new Error(data.error || "Ingen saker");
-    el("vg-body").innerHTML = data.items.map(item => {
-      const dt = item.date ? new Date(item.date).toLocaleString("no-NO",
-        {timeZone:"Europe/Oslo",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}) : "";
-      return '<div class="pol-item" style="border-left:2px solid #ff6b35;background:rgba(255,107,53,.04);cursor:pointer" onclick="window.open(\'' + (item.url||"https://vg.no").replace(/'/g,"%27") + '\',\'_blank\')">' +
-        '<div class="pol-meta"><span>' + dt + '</span></div>' +
-        '<div class="pol-title">' + item.title + '</div></div>';
-    }).join("") + '<div class="pol-src">Kilde: VG.no · Oppdateres hvert 5. min</div>';
+    newsCache[tab] = data.items;
+    if (activeTab === tab) renderNews(tab, data.items);
   } catch(e) {
-    el("vg-body").innerHTML = '<div class="loading err-text">⚠ ' + e.message + '</div>';
+    if (activeTab === tab)
+      el("vg-body").innerHTML = '<div class="loading err-text">⚠ ' + e.message + '</div>';
   }
+}
+
+function renderNews(tab, items) {
+  const color = newsEndpoints[tab].color;
+  const label = newsEndpoints[tab].label;
+  el("vg-body").innerHTML = items.map(item => {
+    const dt = item.date ? new Date(item.date).toLocaleString("no-NO",
+      {timeZone:"Europe/Oslo",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}) : "";
+    const url = (item.url||"#").replace(/'/g, "%27");
+    return '<div class="pol-item" style="border-left:2px solid ' + color + ';background:rgba(0,0,0,.15);cursor:pointer;transition:filter .15s" ' +
+      'onmouseover="this.style.filter='brightness(1.4)'" onmouseout="this.style.filter=''" ' +
+      'onclick="window.open(\'' + url + '\',\'_blank\')">' +
+      '<div class="pol-meta"><span>' + dt + '</span></div>' +
+      '<div class="pol-title">' + item.title + '</div></div>';
+  }).join("") + '<div class="pol-src">Kilde: ' + label + ' · Oppdateres hvert 5. min</div>';
+}
+
+function loadVG() { fetchNews("vg"); }
+
+function refreshNews() {
+  newsCache[activeTab] = null;
+  fetchNews(activeTab);
 }
 
 // ─── AMBASSADE-VARSEL ─────────────────────────────────────────────────────────
@@ -1100,7 +1163,7 @@ loadDepartures();
 loadWeather();
 loadAirQuality();
 loadPolice();
-loadVG();
+fetchNews('vg'); fetchNews('db'); fetchNews('tv2');
 loadAmbassade();
 loadTravelTimes();
 loadCamerasDatex();
@@ -1111,7 +1174,7 @@ setInterval(loadDepartures,   60000);
 setInterval(loadWeather,     300000);
 setInterval(loadAirQuality,  600000);
 setInterval(loadPolice,      180000);
-setInterval(loadVG,          300000);
+setInterval(() => { Object.keys(newsCache).forEach(t => { newsCache[t]=null; }); fetchNews(activeTab); }, 300000);
 setInterval(loadAmbassade,   300000);
 setInterval(loadTravelTimes, 300000);   // DATEX updates every 5 min
 setInterval(loadIncidents,   300000);

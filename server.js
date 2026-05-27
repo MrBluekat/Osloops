@@ -567,6 +567,38 @@ app.get("/api/vgnyheter", async (req, res) => {
   }
 });
 
+// ─── Dagbladet RSS ────────────────────────────────────────────────────────────
+app.get("/api/dagbladet", async (req, res) => {
+  try {
+    const upstream = await fetch("https://www.dagbladet.no/feed/rss", {
+      headers: { "User-Agent": "oslo-ops-center/1.0", "Accept": "application/rss+xml, text/xml" }
+    });
+    if (!upstream.ok) throw new Error("Dagbladet svarte " + upstream.status);
+    const items = parseRssItems(await upstream.text(), 10);
+    console.log("Dagbladet: " + items.length + " saker");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.json({ ok: true, items });
+  } catch (e) {
+    res.status(502).json({ ok: false, error: e.message, items: [] });
+  }
+});
+
+// ─── TV2 RSS ──────────────────────────────────────────────────────────────────
+app.get("/api/tv2", async (req, res) => {
+  try {
+    const upstream = await fetch("https://www.tv2.no/rss", {
+      headers: { "User-Agent": "oslo-ops-center/1.0", "Accept": "application/rss+xml, text/xml" }
+    });
+    if (!upstream.ok) throw new Error("TV2 svarte " + upstream.status);
+    const items = parseRssItems(await upstream.text(), 10);
+    console.log("TV2: " + items.length + " saker");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.json({ ok: true, items });
+  } catch (e) {
+    res.status(502).json({ ok: false, error: e.message, items: [] });
+  }
+});
+
 // ─── Ambassade-nyhetsvarsel ────────────────────────────────────────────────────
 // Søker RSS-feeds fra de siste 7 dagene (RSS inneholder typisk siste 30-50 saker)
 const EMBASSY_KEYWORDS = [
