@@ -360,6 +360,32 @@
     </div>
     <!-- incidents injected here by JS -->
     <div id="incidents-wrapper"></div>
+
+    <!-- VG NYHETER -->
+    <div class="panel" id="vg-panel">
+      <div class="panel-glow"></div>
+      <div class="panel-head">
+        <span class="panel-title">📰 VG — SISTE NYHETER</span>
+        <div class="panel-actions">
+          <button class="btn" onclick="loadVG()">↻</button>
+          <span class="badge badge-orange">VG.NO</span>
+        </div>
+      </div>
+      <div id="vg-body"><div class="loading"><div class="spinner"></div>HENTER…</div></div>
+    </div>
+
+    <!-- AMBASSADE-VARSEL -->
+    <div class="panel" id="amb-panel">
+      <div class="panel-glow"></div>
+      <div class="panel-head">
+        <span class="panel-title">🚨 NEWS ALERT — AMERIKAS AMBASSADE</span>
+        <div class="panel-actions">
+          <button class="btn" onclick="loadAmbassade()">↻</button>
+          <span class="badge" style="background:rgba(255,56,56,.15);color:#ff3838;border:1px solid rgba(255,56,56,.3)">ALERT</span>
+        </div>
+      </div>
+      <div id="amb-body"><div class="loading"><div class="spinner"></div>SØKER…</div></div>
+    </div>
   </div>
 
   <!-- RIGHT COLUMN: departures → travel → weather → AQ (stacked, no gaps) -->
@@ -1027,10 +1053,55 @@ async function loadIncidents() {
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
+// ─── VG NYHETER ──────────────────────────────────────────────────────────────
+async function loadVG() {
+  el("vg-body").innerHTML = '<div class="loading"><div class="spinner"></div>HENTER VG…</div>';
+  try {
+    const res  = await fetch("/api/vgnyheter");
+    const data = await res.json();
+    if (!data.ok || !data.items.length) throw new Error(data.error || "Ingen saker");
+    el("vg-body").innerHTML = data.items.map(item => {
+      const dt = item.date ? new Date(item.date).toLocaleString("no-NO",
+        {timeZone:"Europe/Oslo",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}) : "";
+      return '<div class="pol-item" style="border-left:2px solid #ff6b35;background:rgba(255,107,53,.04);cursor:pointer" onclick="window.open('' + (item.url||"https://vg.no") + '','_blank')">' +
+        '<div class="pol-meta"><span>' + dt + '</span></div>' +
+        '<div class="pol-title">' + item.title + '</div></div>';
+    }).join("") + '<div class="pol-src">Kilde: VG.no · Oppdateres hvert 5. min</div>';
+  } catch(e) {
+    el("vg-body").innerHTML = '<div class="loading err-text">⚠ ' + e.message + '</div>';
+  }
+}
+
+// ─── AMBASSADE-VARSEL ─────────────────────────────────────────────────────────
+async function loadAmbassade() {
+  el("amb-body").innerHTML = '<div class="loading"><div class="spinner"></div>SØKER NORSKE MEDIER…</div>';
+  try {
+    const res  = await fetch("/api/ambassade");
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "Feil");
+    if (!data.items.length) {
+      el("amb-body").innerHTML = '<div class="loading" style="color:var(--g3)">Ingen treff akkurat nå · Søker etter: amerikanske ambassaden, USAs ambassade</div>';
+      return;
+    }
+    el("amb-body").innerHTML = data.items.map(item => {
+      const dt = item.date ? new Date(item.date).toLocaleString("no-NO",
+        {timeZone:"Europe/Oslo",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}) : "";
+      return '<div class="pol-item" style="border-left:2px solid #ff3838;background:rgba(255,56,56,.05);cursor:pointer" onclick="window.open('' + (item.url||"#") + '','_blank')">' +
+        '<div class="pol-meta"><span>' + dt + '</span>' +
+        (item.source ? '<span class="pol-cat">' + item.source + '</span>' : '') + '</div>' +
+        '<div class="pol-title">' + item.title + '</div></div>';
+    }).join("") + '<div class="pol-src">Søker: VG · Aftenposten · NRK · Dagbladet · TV2 · Nettavisen</div>';
+  } catch(e) {
+    el("amb-body").innerHTML = '<div class="loading err-text">⚠ ' + e.message + '</div>';
+  }
+}
+
 loadDepartures();
 loadWeather();
 loadAirQuality();
 loadPolice();
+loadVG();
+loadAmbassade();
 loadTravelTimes();
 loadCamerasDatex();
 
@@ -1040,6 +1111,8 @@ setInterval(loadDepartures,   60000);
 setInterval(loadWeather,     300000);
 setInterval(loadAirQuality,  600000);
 setInterval(loadPolice,      180000);
+setInterval(loadVG,          300000);
+setInterval(loadAmbassade,   300000);
 setInterval(loadTravelTimes, 300000);   // DATEX updates every 5 min
 setInterval(loadIncidents,   300000);
 </script>

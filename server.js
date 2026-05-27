@@ -521,6 +521,89 @@ app.get("/api/politiloggen", async (req, res) => {
   }
 });
 
+// ─── VG Nyheter RSS ───────────────────────────────────────────────────────────
+app.get("/api/vgnyheter", async (req, res) => {
+  try {
+    const upstream = await fetch("https://vg.no/rss/feed/?format=rss", {
+      headers: { "User-Agent": "oslo-ops-center/1.0", "Accept": "application/rss+xml, text/xml" }
+    });
+    if (!upstream.ok) throw new Error("VG svarte " + upstream.status);
+    const xml  = await upstream.text();
+    const items = [];
+    for (const m of [...xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)].slice(0, 10)) {
+      const b = m[1];
+      const tag = t => {
+        const r = b.match(new RegExp("<" + t + "[^>]*><!\[CDATA\[([\s\S]*?)\]\]><\/" + t + ">")) ||
+                  b.match(new RegExp("<" + t + "[^>]*>([\s\S]*?)<\/" + t + ">"));
+        return r ? r[1].trim() : "";
+      };
+      const title = tag("title");
+      if (title) items.push({ title, date: tag("pubDate"), url: tag("link") || tag("guid") });
+    }
+    console.log("VG nyheter: " + items.length + " saker");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.json({ ok: true, items });
+  } catch (e) {
+    console.error("VG error:", e.message);
+    res.status(502).json({ ok: false, error: e.message, items: [] });
+  }
+});
+
+// ─── Ambassade-nyhetsvarsel — søker i norske RSS-feeds ────────────────────────
+const EMBASSY_KEYWORDS = [
+  "amerikanske ambassaden", "amerikas ambassade", "usas ambassade",
+  "den amerikanske ambassaden", "usa-ambassaden", "us-ambassaden",
+  "american embassy", "us embassy oslo"
+];
+
+const NEWS_FEEDS = [
+  "https://vg.no/rss/feed/?format=rss",
+  "https://www.aftenposten.no/rss",
+  "https://www.nrk.no/toppsaker.rss",
+  "https://www.dagbladet.no/feed/rss",
+  "https://www.tv2.no/rss",
+  "https://www.nettavisen.no/rss.xml",
+];
+
+app.get("/api/ambassade", async (req, res) => {
+  const results = [];
+  await Promise.allSettled(NEWS_FEEDS.map(async feedUrl => {
+    try {
+      const r = await fetch(feedUrl, {
+        headers: { "User-Agent": "oslo-ops-center/1.0", "Accept": "application/rss+xml, text/xml" },
+        signal: AbortSignal.timeout(5000)
+      });
+      if (!r.ok) return;
+      const xml = await r.text();
+      const source = feedUrl.match(/\/\/(www\.)?([^/]+)/)?.[2] || feedUrl;
+      for (const m of [...xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)]) {
+        const b = m[1];
+        const tag = t => {
+          const r2 = b.match(new RegExp("<" + t + "[^>]*><!\[CDATA\[([\s\S]*?)\]\]><\/" + t + ">")) ||
+                     b.match(new RegExp("<" + t + "[^>]*>([\s\S]*?)<\/" + t + ">"));
+          return r2 ? r2[1].trim() : "";
+        };
+        const title = tag("title");
+        const desc  = tag("description");
+        const combined = (title + " " + desc).toLowerCase();
+        if (EMBASSY_KEYWORDS.some(kw => combined.includes(kw))) {
+          results.push({
+            title,
+            date:   tag("pubDate"),
+            url:    tag("link") || tag("guid"),
+            source,
+          });
+        }
+      }
+    } catch (_) {}
+  }));
+  // Sort newest first
+  results.sort((a, b) => new Date(b.date||0) - new Date(a.date||0));
+  console.log("Ambassade-varsel: " + results.length + " treff");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.json({ ok: true, count: results.length, items: results.slice(0, 10) });
+});
+
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
