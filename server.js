@@ -453,19 +453,25 @@ app.get("/camerasfull", async (req, res) => {
   }
 });
 
-// ─── Police RSS proxy ────────────────────────────────────────────────────────
-app.get("/rss/politi", async (req, res) => {
+// ─── Politiloggen API proxy — operative hendelser Oslo ───────────────────────
+app.get("/rss/politiloggen", async (req, res) => {
   try {
-    const upstream = await fetch("https://www.politiet.no/api/rss/nyheter?distrikt=oslo", {
-      headers: { "User-Agent": "oslo-ops-center/1.0", "Accept": "application/rss+xml, application/xml, text/xml" }
+    // Official Politiloggen API v1
+    const upstream = await fetch("https://api.politiet.no/politiloggen/v1/rss?districts=oslo", {
+      headers: {
+        "User-Agent": "oslo-ops-center/1.0",
+        "Accept": "application/rss+xml, application/xml, text/xml"
+      }
     });
-    if (!upstream.ok) throw new Error("Politiet svarte " + upstream.status);
+    if (!upstream.ok) throw new Error("Politiet API svarte " + upstream.status);
     const xml = await upstream.text();
+    console.log("Politiloggen: fetched, length=" + xml.length);
     res.setHeader("Content-Type", "application/xml; charset=utf-8");
     res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cache-Control", "no-cache");
     res.send(xml);
   } catch (e) {
-    console.error("Police RSS error:", e.message);
+    console.error("Politiloggen error:", e.message);
     res.status(502).send("<?xml version='1.0'?><error>" + e.message + "</error>");
   }
 });
