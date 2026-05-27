@@ -100,6 +100,58 @@ app.get("/debug/allroutes", async (req, res) => {
   }
 });
 
+// ─── Debug: which Oslo cameras have video streams ────────────────────────────
+app.get("/debug/cameravideo", async (req, res) => {
+  try {
+    const xml = await datexGet("GetCCTVSiteTable");
+    const lines = [];
+
+    const records = [...xml.matchAll(/<cctvCameraMetadataRecord[^>]*>([\s\S]*?)<\/cctvCameraMetadataRecord>/gi)];
+
+    for (const m of records) {
+      const block = m[1];
+      const lat  = parseFloat(block.match(/<latitude>([^<]+)<\/latitude>/i)?.[1] || "0");
+      const lon  = parseFloat(block.match(/<longitude>([^<]+)<\/longitude>/i)?.[1] || "0");
+
+      // Oslo area only
+      if (!(lat > 59.7 && lat < 60.2 && lon > 10.3 && lon < 11.0)) continue;
+
+      const id    = m[0].match(/id="([^"]+)"/)?.[1] || "?";
+      const descB = block.match(/<cctvCameraSiteLocalDescription[^>]*>([\s\S]*?)<\/cctvCameraSiteLocalDescription>/i)?.[1] || "";
+      const name  = descB.match(/<value[^>]*>([^<]+)<\/value>/i)?.[1]?.trim() || id;
+
+      // Still image URL
+      const stillB  = block.match(/<cctvStillImageService[^>]*>([\s\S]*?)<\/cctvStillImageService>/i)?.[1] || "";
+      const stillUrl = stillB.match(/<urlLinkAddress>([^<]+)<\/urlLinkAddress>/i)?.[1]?.trim() || "(ingen)";
+
+      // Video URL
+      const videoB   = block.match(/<cctvVideoService[^>]*>([\s\S]*?)<\/cctvVideoService>/i)?.[1] || "";
+      const videoUrl = videoB.match(/<urlLinkAddress>([^<]+)<\/urlLinkAddress>/i)?.[1]?.trim() || "(ingen)";
+      const hasVideo = videoUrl && videoUrl !== "(ingen)" && videoUrl.length > 5;
+
+      lines.push(`${hasVideo ? "✓ VIDEO" : "✗ bilde"} | ${name.padEnd(35)} | ${hasVideo ? videoUrl : stillUrl}`);
+    }
+
+    lines.sort((a, b) => b.startsWith("✓") - a.startsWith("✓") || a.localeCompare(b, "no"));
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.send(
+      "Oslo-kameraer med videofeed:
+" +
+      "=".repeat(80) + "
+" +
+      lines.join("
+") + "
+
+" +
+      "Totalt: " + lines.length + " kameraer (" +
+      lines.filter(l => l.startsWith("✓")).length + " med video, " +
+      lines.filter(l => l.startsWith("✗")).length + " kun bilde)"
+    );
+  } catch (e) {
+    res.status(502).send("Feil: " + e.message);
+  }
+});
+
 // ─── Debug — visit /debug/cameras, /debug/travel, /debug/incidents, /debug/locations
 app.get("/debug/:name", async (req, res) => {
   const map = {
@@ -123,38 +175,30 @@ app.get("/debug/:name", async (req, res) => {
 // ─── Travel times ─────────────────────────────────────────────────────────────
 // Location names are "Fra - Til" format e.g. "Ammerud - Bjerke"
 // Coordinates are UTM32 — not usable for geo-filter, so we filter by name instead
-// Eksakte strekninger vi vil vise — begge retninger (A→B og B→A)
-const OSLO_ROUTES = [
-  // E6 nord/sør
-  ["hvam","manglerud"], ["hvam","ryen"],
-  ["manglerud","hvam"], ["ryen","hvam"],
-  ["klemetsrud","ryen"], ["klemetsrud","operatunnelen"],
-  ["ryen","klemetsrud"], ["operatunnelen","klemetsrud"],
-  ["operatunnelen"],   // enkeltpunkt — match alt med "operatunnelen"
+// Eksakte DATEX-ID-er bekreftet fra /debug/allroutes — kun Oslo-området
+const OSLO_IDS = new Set([
+  "100361", "100362", // Ammerud - Bjerke / Bjerke - Ammerud
+  "100363", "100364", // Bjerke - Grefsen / Grefsen - Bjerke
+  "100365", "100366", // Bjerke - Teisen / Teisen - Bjerke
+  "100367", "100368", // Bjerke - Helsfyr / Helsfyr - Bjerke
+  "100147", "100148", // Helsfyr - Ryen / Ryen - Helsfyr
+  "100103", "100104", // Klemetsrud - Ryen / Ryen - Klemetsrud
+  "100169", "100172", // Teisen - Ryen / Ryen - Teisen  (170=Teisen-Grefsen, 172=Teisen-Ryen)
+  "100177", "100152", // Helsfyr - Karihaugen / Karihaugen - Helsfyr
+  "100086", "100087", // Filipstad - Ryen / Ryen - Filipstad
+  "100096", "100097", // Helsfyr - Filipstad / Filipstad - Helsfyr
+  "100108", "100111", // Filipstad - Skøyen / Skøyen - Filipstad
+  "100159", "100162", // Holmen - Sandvika / Sandvika - Holmen
+  "100256", "100257", // Sandvika - Vøyenenga / Vøyenenga - Sandvika
+  "100098", "100101", // Asker - Holmen / Holmen - Asker
+  "100084", "100085", // Ullevål - Strand / Strand - Ullevål
+  "100113", "100114", // Grefsen - Ullevål / Ullevål - Grefsen
+  "100151", "100178", // Skedsmovollen - Karihaugen / Karihaugen - Skedsmovollen
+  "100254", "100255", // Blåkollen - Lillestrømbrua / Lillestrømbrua - Blåkollen
+]);
 
-  // E18 vest/øst
-  ["asker","lysaker"], ["lysaker","filipstad"],
-  ["asker","filipstad"],
-  ["filipstad","lysaker"], ["lysaker","asker"],
-  ["filipstad","asker"],
-  ["fiskevollen","mosseveien"], ["fiskevollen","bjørvika"],
-  ["mosseveien","fiskevollen"], ["bjørvika","fiskevollen"],
-
-  // Ring 3 / Rv150
-  ["ryen","granfosstunnelen"], ["granfosstunnelen","ryen"],
-  ["manglerud","sinsen"], ["sinsen","manglerud"],
-  ["bryn","smestad"], ["smestad","bryn"],
-  ["sinsen","ullevål"], ["ullevål","sinsen"],
-  ["ullevål","smestad"], ["smestad","ullevål"],
-
-  // Rv4 / E16
-  ["gjelleråsen","sinsen"], ["sinsen","gjelleråsen"],
-  ["sandvika","skui"], ["skui","sandvika"],
-];
-
-function isOslo(name) {
-  const l = name.toLowerCase();
-  return OSLO_ROUTES.some(pair => pair.every(kw => l.includes(kw)));
+function isOslo(id) {
+  return OSLO_IDS.has(id);
 }
 
 app.get("/travel", async (req, res) => {
@@ -189,8 +233,8 @@ app.get("/travel", async (req, res) => {
       const label = locMap[id] || "";
       if (!label) continue;
 
-      // Filter to Oslo area by name
-      if (!isOslo(label)) continue;
+      // Filter to confirmed Oslo IDs
+      if (!isOslo(id)) continue;
 
       const secs     = parseFloat(block.match(/<travelTime[^>]*>\s*<duration[^>]*>([^<]+)<\/duration>/i)?.[1] || "0");
       const freeSecs = parseFloat(block.match(/<freeFlowTravelTime[^>]*>\s*<duration[^>]*>([^<]+)<\/duration>/i)?.[1] || "0");
