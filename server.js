@@ -356,6 +356,93 @@ app.get("/camimg", async (req, res) => {
   }
 });
 
+// ─── HLS video proxy ─────────────────────────────────────────────────────────
+// Proxies m3u8 playlists AND .ts segments from kamera.vegvesen.no
+// Rewrites m3u8 so segment URLs point back through our proxy
+app.get("/videoproxy", async (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).send("Mangler url");
+  const decoded = decodeURIComponent(url);
+  if (!decoded.startsWith("https://kamera.vegvesen.no")) {
+    return res.status(403).send("Forbudt domene");
+  }
+  try {
+    const upstream = await fetch(decoded, {
+      headers: { Authorization: "Basic " + DATEX_AUTH, "User-Agent": "oslo-ops-center/1.0" }
+    });
+    if (!upstream.ok) return res.status(upstream.status).send("Video " + upstream.status);
+
+    const ct = upstream.headers.get("content-type") || "";
+
+    if (decoded.endsWith(".m3u8") || ct.includes("mpegurl") || ct.includes("x-mpegURL")) {
+      // Rewrite m3u8: make all relative URLs absolute and route through proxy
+      let text = await upstream.text();
+      const base = decoded.substring(0, decoded.lastIndexOf("/") + 1);
+      text = text.replace(/^(?!#)(.+\.ts.*)$/gm, (line) => {
+        const absUrl = line.startsWith("http") ? line : base + line;
+        return "/videoproxy?url=" + encodeURIComponent(absUrl);
+      });
+      text = text.replace(/^(?!#)(.+\.m3u8.*)$/gm, (line) => {
+        const absUrl = line.startsWith("http") ? line : base + line;
+        return "/videoproxy?url=" + encodeURIComponent(absUrl);
+      });
+      res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Cache-Control", "no-cache");
+      return res.send(text);
+    }
+
+    // .ts video segments — pipe through as-is
+    const buf = await upstream.arrayBuffer();
+    res.setHeader("Content-Type", upstream.headers.get("content-type") || "video/MP2T");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cache-Control", "public, max-age=5");
+    res.send(Buffer.from(buf));
+  } catch (e) {
+    res.status(502).send("Video proxy feil: " + e.message);
+  }
+});
+
+// ─── Camera list with video flag ──────────────────────────────────────────────
+// Returns both still image URL and video proxy URL if available
+app.get("/camerasfull", async (req, res) => {
+  try {
+    const xml     = await datexGet("GetCCTVSiteTable");
+    const cameras = [];
+    const records = [...xml.matchAll(/<cctvCameraMetadataRecord[^>]*>([\s\S]*?)<\/cctvCameraMetadataRecord>/gi)];
+
+    for (const m of records) {
+      const block = m[1];
+      const lat   = parseFloat(block.match(/<latitude>([^<]+)<\/latitude>/i)?.[1] || "0");
+      const lon   = parseFloat(block.match(/<longitude>([^<]+)<\/longitude>/i)?.[1] || "0");
+      if (!(lat > 59.7 && lat < 60.2 && lon > 10.3 && lon < 11.0)) continue;
+
+      const descB  = block.match(/<cctvCameraSiteLocalDescription[^>]*>([\s\S]*?)<\/cctvCameraSiteLocalDescription>/i)?.[1] || "";
+      const name   = descB.match(/<value[^>]*>([^<]+)<\/value>/i)?.[1]?.trim() || "Kamera";
+
+      const stillB   = block.match(/<cctvStillImageService[^>]*>([\s\S]*?)<\/cctvStillImageService>/i)?.[1] || "";
+      const stillUrl = stillB.match(/<urlLinkAddress>([^<]+)<\/urlLinkAddress>/i)?.[1]?.trim() || "";
+
+      const videoB   = block.match(/<cctvVideoService[^>]*>([\s\S]*?)<\/cctvVideoService>/i)?.[1] || "";
+      const videoUrl = videoB.match(/<urlLinkAddress>([^<]+)<\/urlLinkAddress>/i)?.[1]?.trim() || "";
+      const hasVideo = videoUrl && videoUrl.length > 5;
+
+      cameras.push({
+        name,
+        lat,
+        lon,
+        imgUrl:   stillUrl ? "/camimg?url=" + encodeURIComponent(stillUrl) : null,
+        videoUrl: hasVideo  ? "/videoproxy?url=" + encodeURIComponent(videoUrl) : null,
+      });
+    }
+
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.json({ ok: true, count: cameras.length, cameras: cameras.slice(0, 12) });
+  } catch (e) {
+    res.status(502).json({ ok: false, error: e.message, cameras: [] });
+  }
+});
+
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 

@@ -206,6 +206,7 @@
       grid-column:1!important;grid-row:auto!important}
   }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.7/hls.min.js"></script>
 </head>
 <body>
 
@@ -733,21 +734,66 @@ function renderCamGrid(cams) {
     </div>`).join("");
 }
 
+// Track active HLS instances so we can destroy them on reload
+const hlsInstances = [];
+
 async function loadCamerasDatex() {
   try {
-    // Use the server's /cameras endpoint — returns clean JSON,
-    // and images are served via /camimg proxy (bypasses Vegvesen CORS)
-    const res = await fetch("/cameras");
+    const res  = await fetch("/camerasfull");
     const data = await res.json();
-
-    if (data.error || !data.cameras?.length) throw new Error(data.error || "No cameras");
-
-    const cams = data.cameras.map(c => ({ l: c.name, u: c.url }));
-    renderCamGrid(cams);
+    if (!data.ok || !data.cameras?.length) throw new Error(data.error || "No cameras");
+    renderCamGridFull(data.cameras);
   } catch(e) {
     console.warn("DATEX cameras failed, using fallback:", e.message);
     renderCamGrid(FALLBACK_CAMS);
   }
+}
+
+function renderCamGridFull(cameras) {
+  // Destroy any existing HLS instances
+  hlsInstances.forEach(h => h.destroy());
+  hlsInstances.length = 0;
+
+  const grid = el("cam-grid");
+  grid.innerHTML = cameras.map((c, i) => {
+    if (c.videoUrl) {
+      return `<div class="cam-card">
+        <div class="cam-wrap" style="aspect-ratio:16/10;position:relative;background:#000">
+          <video id="camvid-${i}" style="width:100%;height:100%;object-fit:cover;display:block;filter:saturate(.6) contrast(1.15)" muted playsinline></video>
+          <span class="cam-rec">● LIVE</span>
+        </div>
+        <div class="cam-lbl">${c.name}</div>
+      </div>`;
+    } else {
+      const imgUrl = c.imgUrl || "";
+      return `<div class="cam-card" onclick="window.open('${imgUrl}','_blank')">
+        <div class="cam-wrap">
+          <img src="${imgUrl}" alt="${c.name}" loading="lazy"
+            onerror="this.parentElement.innerHTML='<div class=\\'cam-err\\'><span style=\\'font-size:20px\\'>📷</span><span>${c.name}</span></div>'">
+          <span class="cam-rec">● REC</span>
+        </div>
+        <div class="cam-lbl">${c.name}</div>
+      </div>`;
+    }
+  }).join("");
+
+  // Init HLS players after DOM is updated
+  cameras.forEach((c, i) => {
+    if (!c.videoUrl) return;
+    const video = el("camvid-" + i);
+    if (!video) return;
+    if (Hls.isSupported()) {
+      const hls = new Hls({ lowLatencyMode: true, maxBufferLength: 10 });
+      hls.loadSource(c.videoUrl);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
+      hlsInstances.push(hls);
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      // Safari native HLS
+      video.src = c.videoUrl;
+      video.play().catch(() => {});
+    }
+  });
 }
 
 // ─── INCIDENTS — server parses DATEX, returns clean JSON ────────────────────
