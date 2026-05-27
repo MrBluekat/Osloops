@@ -614,9 +614,22 @@ app.get("/api/ambassade", async (req, res) => {
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
-// ─── Catch-all → index.html ───────────────────────────────────────────────────
+// ─── Catch-all → index.html (injects GM key from env) ───────────────────────
+import { readFileSync } from "fs";
+let _indexHtml = null;
+function getIndex() {
+  if (!_indexHtml) _indexHtml = readFileSync(path.join(__dirname, "public", "index.html"), "utf8");
+  return _indexHtml;
+}
 app.get("*", (_req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+  const gmKey = process.env.GM_KEY || "";
+  if (!gmKey) return res.sendFile(path.join(__dirname, "public", "index.html"));
+  // Inject the key so the page auto-initialises Google Maps without user input
+  const marker = 'const savedKey = localStorage.getItem("gm_key");' ;
+  const inject = 'const savedKey = "' + gmKey + '" || localStorage.getItem("gm_key");' ;
+  const html   = getIndex().replace(marker, inject);
+  res.setHeader("Content-Type", "text/html");
+  res.send(html);
 });
 
 app.listen(PORT, () => console.log(`Oslo Ops Center running on http://localhost:${PORT}`));
