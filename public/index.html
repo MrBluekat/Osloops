@@ -148,7 +148,7 @@
   #map-nokey a{color:var(--g);font-size:9px;text-decoration:none;text-shadow:var(--glow)}
 
   /* ── DEPARTURES ── */
-  #dep-panel{grid-column:1;grid-row:1}
+  #dep-panel{grid-column:2;grid-row:1}
   .dep-row{display:grid;grid-template-columns:30px 1fr 50px;gap:8px;align-items:center;
     padding:8px 10px;border-bottom:1px solid rgba(0,100,30,.4);transition:background .15s}
   .dep-row:last-child{border-bottom:none}
@@ -184,7 +184,7 @@
   .aq-src{padding:2px 10px 8px;font-size:8px;color:var(--g3)}
 
   /* ── CAMERAS ── */
-  #cam-panel{grid-column:1;grid-row:2}
+  #cam-panel{grid-column:1;grid-row:1/4}
   .cam-section-label{
     font-size:9px;letter-spacing:2px;color:var(--g3);text-transform:uppercase;
     padding:6px 8px 4px;display:flex;align-items:center;gap:6px;
@@ -268,7 +268,7 @@
   .d-ok{color:var(--g)} .d-warn{color:var(--yel)} .d-bad{color:var(--red)}
 
   /* ── POLICE / INCIDENTS ── */
-  #police-panel{grid-column:1/-1;grid-row:3}
+  #police-panel{grid-column:1/-1;grid-row:4}
   .pol-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
     gap:8px;padding:10px}
   .pol-item{border-radius:0 2px 2px 0;padding:8px 10px}
@@ -706,14 +706,15 @@ function renderAQ(data) {
       <div class="aq-name">${s.name}${s.unit ? " " + s.unit : ""}</div>
       <div class="aq-lbl" style="color:${s.color}">${s.label || "&nbsp;"}</div>
     </div>`).join("")
-  }</div><div class="aq-src">Source: Open-Meteo · Copernicus CAMS · No key needed</div>`;
+  }</div><div class="aq-src">Source: Open-Meteo · Copernicus CAMS · Oppdateres 1 gang i timen</div>`;
 }
 
 // ─── POLICE RSS ───────────────────────────────────────────────────────────────
 async function loadPolice() {
   el("police-body").innerHTML = '<div class="loading"><div class="spinner"></div>FETCHING…</div>';
   try {
-    const res = await fetch("https://www.politiet.no/api/rss/nyheter?distrikt=oslo");
+    // Fetch via server proxy to avoid CORS
+    const res = await fetch("/rss/politi");
     const txt = await res.text();
     const items = [...txt.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0,10).map(m => {
       const b = m[1];

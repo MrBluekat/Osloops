@@ -453,6 +453,23 @@ app.get("/camerasfull", async (req, res) => {
   }
 });
 
+// ─── Police RSS proxy ────────────────────────────────────────────────────────
+app.get("/rss/politi", async (req, res) => {
+  try {
+    const upstream = await fetch("https://www.politiet.no/api/rss/nyheter?distrikt=oslo", {
+      headers: { "User-Agent": "oslo-ops-center/1.0", "Accept": "application/rss+xml, application/xml, text/xml" }
+    });
+    if (!upstream.ok) throw new Error("Politiet svarte " + upstream.status);
+    const xml = await upstream.text();
+    res.setHeader("Content-Type", "application/xml; charset=utf-8");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.send(xml);
+  } catch (e) {
+    console.error("Police RSS error:", e.message);
+    res.status(502).send("<?xml version='1.0'?><error>" + e.message + "</error>");
+  }
+});
+
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
