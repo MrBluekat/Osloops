@@ -1117,15 +1117,15 @@ function renderNews(tab, items) {
   const color = newsEndpoints[tab].color;
   const label = newsEndpoints[tab].label;
   el("vg-body").innerHTML = items.map(item => {
-    const dt = item.date ? new Date(item.date).toLocaleString("no-NO",
+    const dt  = item.date ? new Date(item.date).toLocaleString("no-NO",
       {timeZone:"Europe/Oslo",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}) : "";
-    const url = (item.url||"#").replace(/'/g, "%27");
-    return '<div class="pol-item" style="border-left:2px solid ' + color + ';background:rgba(0,0,0,.15);cursor:pointer;transition:filter .15s" ' +
-      'onmouseover="this.style.filter='brightness(1.4)'" onmouseout="this.style.filter=''" ' +
-      'onclick="window.open(\'' + url + '\',\'_blank\')">' +
-      '<div class="pol-meta"><span>' + dt + '</span></div>' +
-      '<div class="pol-title">' + item.title + '</div></div>';
-  }).join("") + '<div class="pol-src">Kilde: ' + label + ' · Oppdateres hvert 5. min</div>';
+    const url = (item.url || "#").replace(/'/g, "%27");
+    return `<div class="pol-item" style="border-left:2px solid ${color};background:rgba(0,0,0,.15);cursor:pointer"
+      onclick="window.open('${url}','_blank')">
+      <div class="pol-meta"><span>${dt}</span></div>
+      <div class="pol-title">${item.title}</div>
+    </div>`;
+  }).join("") + `<div class="pol-src">Kilde: ${label} · Oppdateres hvert 5. min</div>`;
 }
 
 function loadVG() { fetchNews("vg"); }
