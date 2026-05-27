@@ -268,7 +268,7 @@
   .d-ok{color:var(--g)} .d-warn{color:var(--yel)} .d-bad{color:var(--red)}
 
   /* ── POLICE / INCIDENTS ── */
-  #police-panel{grid-column:1/-1;grid-row:2;align-self:start}
+  #police-panel{grid-column:1;grid-row:2;align-self:start}
   .pol-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
     gap:8px;padding:10px}
   .pol-item{border-radius:0 2px 2px 0;padding:8px 10px;transition:filter .15s;cursor:pointer}
@@ -1018,7 +1018,7 @@ async function loadIncidents() {
       const panel = document.createElement("div");
       panel.id = "incidents-panel";
       panel.className = "panel";
-      panel.style.cssText = "grid-column:1/-1;grid-row:3;align-self:start";
+      panel.style.cssText = "grid-column:1;grid-row:3;align-self:start";
       panel.innerHTML = `<div class="panel-glow"></div>
         <div class="panel-head">
           <span class="panel-title">🚧 VEGVESEN HENDELSER — LIVE</span>
