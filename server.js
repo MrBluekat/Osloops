@@ -453,26 +453,55 @@ app.get("/camerasfull", async (req, res) => {
   }
 });
 
-// ─── Politiloggen API proxy — operative hendelser Oslo ───────────────────────
-app.get("/rss/politiloggen", async (req, res) => {
+// ─── Politiloggen JSON API — operative hendelser Oslo ────────────────────────
+app.get("/api/politiloggen", async (req, res) => {
   try {
-    // Official Politiloggen API v1
-    const upstream = await fetch("https://api.politiet.no/politiloggen/v1/rss?districts=oslo", {
-      headers: {
-        "User-Agent": "oslo-ops-center/1.0",
-        "Accept": "application/rss+xml, application/xml, text/xml"
+    // Try JSON API first
+    const upstream = await fetch(
+      "https://api.politiet.no/politiloggen/v1/messages?districts=oslo&count=10&sortOrder=desc",
+      { headers: { "User-Agent": "oslo-ops-center/1.0", "Accept": "application/json" } }
+    );
+
+    if (upstream.ok) {
+      const data = await upstream.json();
+      // Handle both array and { data: [...] } response formats
+      const raw = Array.isArray(data) ? data : (data.data || data.messages || data.items || []);
+      const items = raw.slice(0, 10).map(m => ({
+        title:    m.title || m.message || m.description || JSON.stringify(m).slice(0,100),
+        date:     m.publishedAt || m.createdAt || m.timestamp || m.date || "",
+        category: m.category || m.tema || m.type || "",
+      }));
+      console.log("Politiloggen JSON: " + items.length + " meldinger");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      return res.json({ ok: true, items });
+    }
+
+    // Fallback: scrape the HTML page for police log entries
+    console.log("JSON API svarte " + upstream.status + " — prøver HTML-scraping");
+    const page = await fetch("https://www.politiet.no/politiloggen?distrikt=oslo", {
+      headers: { "User-Agent": "Mozilla/5.0 oslo-ops-center/1.0", "Accept": "text/html" }
+    });
+    if (!page.ok) throw new Error("politiet.no svarte " + page.status);
+    const html = await page.text();
+
+    // Extract incident headings and times from the HTML
+    const items = [];
+    const blocks = [...html.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/gi)];
+    const times  = [...html.matchAll(/(\d{2}:\d{2})\s/g)];
+    blocks.slice(0, 10).forEach((b, i) => {
+      const title = b[1].replace(/<[^>]+>/g, "").trim();
+      if (title && title.length > 5) {
+        items.push({ title, date: "", category: title.split(":")[0] || "" });
       }
     });
-    if (!upstream.ok) throw new Error("Politiet API svarte " + upstream.status);
-    const xml = await upstream.text();
-    console.log("Politiloggen: fetched, length=" + xml.length);
-    res.setHeader("Content-Type", "application/xml; charset=utf-8");
+
+    if (!items.length) throw new Error("Ingen hendelser funnet");
+    console.log("Politiloggen scrape: " + items.length + " meldinger");
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Cache-Control", "no-cache");
-    res.send(xml);
+    res.json({ ok: true, items });
   } catch (e) {
     console.error("Politiloggen error:", e.message);
-    res.status(502).send("<?xml version='1.0'?><error>" + e.message + "</error>");
+    res.status(502).json({ ok: false, error: e.message, items: [] });
   }
 });
 
