@@ -68,6 +68,41 @@ app.get("/datex/:endpoint", async (req, res) => {
   }
 });
 
+// ─── Debug: all routes — lists every location name matched against travel data ─
+app.get("/debug/allroutes", async (req, res) => {
+  try {
+    const [travelXml, locXml] = await Promise.all([
+      datexGet("GetTravelTimeData"),
+      datexGet("GetPredefinedTravelTimeLocations"),
+    ]);
+
+    const locMap = {};
+    for (const m of locXml.matchAll(/<predefinedLocationReference[^>]+id="([^"]+)"[^>]*>([\s\S]*?)<\/predefinedLocationReference>/gi)) {
+      const name = m[2].match(/<value[^>]*>([^<]+)<\/value>/i)?.[1]?.trim();
+      if (name) locMap[m[1]] = name;
+    }
+
+    const seen = new Set();
+    const lines = [];
+    for (const m of travelXml.matchAll(/predefinedLocationReference[^>]+id="([^"]+)"/gi)) {
+      const id = m[1];
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const name = locMap[id] || "(navn ikke funnet)";
+      lines.push(id.padEnd(10) + " " + name);
+    }
+
+    lines.sort((a, b) => a.localeCompare(b, "no"));
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.send("Totalt " + lines.length + " unike strekninger:
+
+" + lines.join("
+"));
+  } catch (e) {
+    res.status(502).send("Feil: " + e.message);
+  }
+});
+
 // ─── Debug — visit /debug/cameras, /debug/travel, /debug/incidents, /debug/locations
 app.get("/debug/:name", async (req, res) => {
   const map = {
@@ -87,40 +122,6 @@ app.get("/debug/:name", async (req, res) => {
   }
 });
 
-// ─── Debug: all routes — lists every location name matched against travel data ─
-// Visit /debug/allroutes to see every strekning name Vegvesen has
-app.get("/debug/allroutes", async (req, res) => {
-  try {
-    const [travelXml, locXml] = await Promise.all([
-      datexGet("GetTravelTimeData"),
-      datexGet("GetPredefinedTravelTimeLocations"),
-    ]);
-
-    // Build id → name map
-    const locMap = {};
-    for (const m of locXml.matchAll(/<predefinedLocationReference[^>]+id="([^"]+)"[^>]*>([\s\S]*?)<\/predefinedLocationReference>/gi)) {
-      const name = m[2].match(/<value[^>]*>([^<]+)<\/value>/i)?.[1]?.trim();
-      if (name) locMap[m[1]] = name;
-    }
-
-    // Collect all unique IDs from travel data
-    const seen = new Set();
-    const lines = [];
-    for (const m of travelXml.matchAll(/predefinedLocationReference[^>]+id="([^"]+)"/gi)) {
-      const id = m[1];
-      if (seen.has(id)) continue;
-      seen.add(id);
-      const name = locMap[id] || "(navn ikke funnet)";
-      lines.push(`${id.padEnd(10)} ${name}`);
-    }
-
-    lines.sort((a, b) => a.localeCompare(b, "no"));
-    res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    res.send("Totalt " + lines.length + " unike strekninger:\n\n" + lines.join("\n"));
-  } catch (e) {
-    res.status(502).send("Feil: " + e.message);
-  }
-});
 
 // ─── Travel times ─────────────────────────────────────────────────────────────
 // Location names are "Fra - Til" format e.g. "Ammerud - Bjerke"
