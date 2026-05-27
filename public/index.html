@@ -649,9 +649,7 @@ async function loadWeather() {
         <div class="w-val" style="color:#00c8ff;font-size:13px">${Math.round(pres)} hPa</div>
         <div class="w-lbl">PRESSURE</div></div>
     </div>
-    <div style="padding:4px 10px 8px;font-family:'Share Tech Mono',monospace;font-size:9px;color:#4a7a9b">
-      Kilde: MET.NO · Oppdateres 1 gang i timen
-    </div>`;
+    <div class="aq-src">Kilde: MET.NO · Oppdateres 1 gang i timen</div>`;
   } catch(e) {
     el("weather-body").innerHTML = `<div class="loading err-text">⚠ ${e.message}</div>`;
   }

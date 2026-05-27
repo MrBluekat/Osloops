@@ -453,50 +453,59 @@ app.get("/camerasfull", async (req, res) => {
   }
 });
 
-// ─── Politiloggen JSON API — operative hendelser Oslo ────────────────────────
+// ─── Politiloggen — scraper politiet.no/politiloggen direkte ─────────────────
 app.get("/api/politiloggen", async (req, res) => {
   try {
-    // Try JSON API first
-    const upstream = await fetch(
-      "https://api.politiet.no/politiloggen/v1/messages?districts=oslo&count=10&sortOrder=desc",
-      { headers: { "User-Agent": "oslo-ops-center/1.0", "Accept": "application/json" } }
-    );
-
-    if (upstream.ok) {
-      const data = await upstream.json();
-      // Handle both array and { data: [...] } response formats
-      const raw = Array.isArray(data) ? data : (data.data || data.messages || data.items || []);
-      const items = raw.slice(0, 10).map(m => ({
-        title:    m.title || m.message || m.description || JSON.stringify(m).slice(0,100),
-        date:     m.publishedAt || m.createdAt || m.timestamp || m.date || "",
-        category: m.category || m.tema || m.type || "",
-      }));
-      console.log("Politiloggen JSON: " + items.length + " meldinger");
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      return res.json({ ok: true, items });
-    }
-
-    // Fallback: scrape the HTML page for police log entries
-    console.log("JSON API svarte " + upstream.status + " — prøver HTML-scraping");
+    // Fetch the politiloggen page and parse the Next.js __NEXT_DATA__ JSON
+    // which contains the actual log entries server-rendered into the page
     const page = await fetch("https://www.politiet.no/politiloggen?distrikt=oslo", {
-      headers: { "User-Agent": "Mozilla/5.0 oslo-ops-center/1.0", "Accept": "text/html" }
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; oslo-ops-center/1.0)",
+        "Accept": "text/html,application/xhtml+xml",
+        "Accept-Language": "no,en;q=0.9",
+      }
     });
     if (!page.ok) throw new Error("politiet.no svarte " + page.status);
     const html = await page.text();
 
-    // Extract incident headings and times from the HTML
-    const items = [];
-    const blocks = [...html.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/gi)];
-    const times  = [...html.matchAll(/(\d{2}:\d{2})\s/g)];
-    blocks.slice(0, 10).forEach((b, i) => {
-      const title = b[1].replace(/<[^>]+>/g, "").trim();
-      if (title && title.length > 5) {
-        items.push({ title, date: "", category: title.split(":")[0] || "" });
+    // Extract __NEXT_DATA__ JSON blob embedded in the page
+    const nextDataMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+    if (nextDataMatch) {
+      const nextData = JSON.parse(nextDataMatch[1]);
+      // Navigate to the messages array — path varies by Next.js version
+      const pageProps = nextData?.props?.pageProps;
+      const messages  = pageProps?.messages || pageProps?.initialMessages ||
+                        pageProps?.dehydratedState?.queries?.[0]?.state?.data?.pages?.[0]?.messages || [];
+      if (messages.length) {
+        const items = messages.slice(0, 10).map(m => ({
+          title:    m.title || m.header || m.message || "(ingen tittel)",
+          date:     m.publishedAt || m.createdAt || m.updatedAt || "",
+          category: m.category || m.tema || "",
+        }));
+        console.log("Politiloggen Next.js data: " + items.length + " meldinger");
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        return res.json({ ok: true, items });
       }
-    });
+    }
 
-    if (!items.length) throw new Error("Ingen hendelser funnet");
-    console.log("Politiloggen scrape: " + items.length + " meldinger");
+    // Fallback: parse rendered HTML — extract article/section headings
+    const items = [];
+    // Match pattern: "Tema: Sted time Description"
+    const articlePattern = /<article[^>]*>([\s\S]*?)<\/article>/gi;
+    const articles = [...html.matchAll(articlePattern)].slice(0, 10);
+    for (const a of articles) {
+      const text = a[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      const titleM = a[1].match(/<h[123][^>]*>([^<]+)<\/h[123]>/i);
+      const title = titleM ? titleM[1].trim() : text.slice(0, 100);
+      const timeM = text.match(/(\d{1,2}:\d{2})/);
+      const catM  = title.match(/^([^:,]+):/);
+      if (title.length > 5) {
+        items.push({ title, date: timeM ? timeM[1] : "", category: catM ? catM[1].trim() : "" });
+      }
+    }
+
+    if (!items.length) throw new Error("Fant ingen hendelser på siden");
+    console.log("Politiloggen HTML-parse: " + items.length + " meldinger");
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.json({ ok: true, items });
   } catch (e) {
