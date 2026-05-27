@@ -586,7 +586,7 @@ app.get("/api/dagbladet", async (req, res) => {
 // ─── Nettavisen RSS ───────────────────────────────────────────────────────────
 app.get("/api/nettavisen", async (req, res) => {
   try {
-    const upstream = await fetch("https://www.nettavisen.no/rss.xml", {
+    const upstream = await fetch("https://www.nettavisen.no/rss/", {
       headers: { "User-Agent": "oslo-ops-center/1.0", "Accept": "application/rss+xml, text/xml" }
     });
     if (!upstream.ok) throw new Error("Nettavisen svarte " + upstream.status);
@@ -645,7 +645,7 @@ const NEWS_FEEDS = [
   "https://www.nrk.no/toppsaker.rss",
   "https://www.dagbladet.no/rss",
   "https://www.tv2.no/rss/nyheter",
-  "https://www.nettavisen.no/rss.xml",
+  "https://www.nettavisen.no/rss/",
 ];
 
 app.get("/api/ambassade", async (req, res) => {
