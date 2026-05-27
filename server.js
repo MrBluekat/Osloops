@@ -436,8 +436,18 @@ app.get("/camerasfull", async (req, res) => {
       });
     }
 
+
+    const EXCLUDE = [
+      "tangen fjordpark","åneby nord","romerikåsen","kløfta","olum",
+      "smaalenes bru","hurum","stryken","råken","bogen","svartskog",
+      "randselva bru","hanekleiva","storsand","holdstad","andelva","støkken"
+    ];
+    const filtered = cameras.filter(c =>
+      !EXCLUDE.some(ex => c.name.toLowerCase().includes(ex))
+    );
+
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.json({ ok: true, count: cameras.length, cameras: cameras });
+    res.json({ ok: true, count: filtered.length, cameras: filtered });
   } catch (e) {
     res.status(502).json({ ok: false, error: e.message, cameras: [] });
   }
