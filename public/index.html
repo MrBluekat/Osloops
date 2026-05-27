@@ -187,7 +187,7 @@
     position:absolute;top:0;left:0;
     width:100%;height:100%;
     object-fit:cover;display:block;
-    filter:saturate(.55) contrast(1.15) brightness(.9);
+
   }
   .cam-err{display:flex;flex-direction:column;align-items:center;justify-content:center;
     height:100%;color:var(--g3);font-size:9px;gap:3px;padding:6px;text-align:center}
@@ -793,6 +793,48 @@ function renderCamGrid(cams) {
 // Track active HLS instances so we can destroy them on reload
 const hlsInstances = [];
 
+// Custom display names — keyed by camera ID in the URL
+const CAM_NAMES = {
+  "3001091_1": "Bjørum (E16 Retning Sandvika)",
+  "0229018_1": "Djupdalen (Retning Skedsmo)",
+  "0329007_1": "Fiskevollbukta (E18 Retning Oslo)",
+  "0629001_1": "Lierskogen (E18 Retning Oslo)",
+  "0329031_1": "Sandstuveien (E6 Retning Abildsø)",
+  "0229009_1": "Sandvika øst (E18 Retning Drammen)",
+  "3001092_1": "Skaret (E16 Retning Sandvika)",
+  "0329034_1": "Ullevål (Ring 3 Retning Sinsen)",
+};
+
+// Also match by partial DATEX name for cameras like Gardermoen and Sonsveien
+const CAM_NAMES_PARTIAL = {
+  "gardermoen": "Gardermoen (E16 Retning Gardermoen)",
+  "sonsveien":  "Sonsveien (E6 Retning Moss)",
+  "bjørum":     "Bjørum (E16 Retning Sandvika)",
+  "djupdalen":  "Djupdalen (Retning Skedsmo)",
+  "skaret":     "Skaret (E16 Retning Sandvika)",
+  "lierskogen": "Lierskogen (E18 Retning Oslo)",
+  "fiskevollbukta": "Fiskevollbukta (E18 Retning Oslo)",
+  "sandstuveien":   "Sandstuveien (E6 Retning Abildsø)",
+  "ullevål":        "Ullevål (Ring 3 Retning Sinsen)",
+  "sandvika":       "Sandvika øst (E18 Retning Drammen)",
+};
+
+function getCamName(cam) {
+  // Try ID match first (most reliable)
+  if (cam.videoUrl || cam.imgUrl) {
+    const url = cam.videoUrl || cam.imgUrl || "";
+    const idMatch = url.match(/\/([^/]+)\/manifest\.m3u8|\/images\/([^/?]+)/);
+    const id = idMatch ? (idMatch[1] || idMatch[2]) : null;
+    if (id && CAM_NAMES[id]) return CAM_NAMES[id];
+  }
+  // Fall back to partial name match
+  const lower = (cam.name || "").toLowerCase();
+  for (const [key, val] of Object.entries(CAM_NAMES_PARTIAL)) {
+    if (lower.includes(key)) return val;
+  }
+  return cam.name;
+}
+
 async function loadCamerasDatex() {
   try {
     const res  = await fetch("/camerasfull");
@@ -858,13 +900,13 @@ function renderCamGridFull(cameras) {
   let stillHtml = "";
 
   live.forEach((c, i) => {
-    liveHtml += `<div class="cam-card-live" onclick="openCamModal('${c.name}', '${c.videoUrl}')">
+    liveHtml += `<div class="cam-card-live" onclick="openCamModal('${getCamName(c)}', '${c.videoUrl}')">
       <div class="cam-wrap">
         <video id="camvid-${i}" muted playsinline></video>
         <span class="cam-rec">● LIVE</span>
         <span class="cam-expand">⛶</span>
       </div>
-      <div class="cam-lbl" style="color:var(--g)">${c.name}</div>
+      <div class="cam-lbl" style="color:var(--g)">${getCamName(c)}</div>
     </div>`;
   });
 
@@ -876,7 +918,7 @@ function renderCamGridFull(cameras) {
           onerror="this.parentElement.innerHTML='<div class=\\'cam-err\\'><span style=\\'font-size:20px\\'>📷</span><span>${c.name}</span></div>'">
         <span class="cam-rec-still">● REC</span>
       </div>
-      <div class="cam-lbl">${c.name}</div>
+      <div class="cam-lbl">${getCamName(c)}</div>
     </div>`;
   });
 
