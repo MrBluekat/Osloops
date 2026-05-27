@@ -369,17 +369,25 @@
       </div>
       <div style="display:flex;gap:0;border-bottom:1px solid var(--g3);background:var(--g4)">
         <button id="tab-vg" onclick="switchTab('vg')"
-          style="flex:1;padding:6px;font-family:'Share Tech Mono',monospace;font-size:10px;
+          style="flex:1;padding:5px 2px;font-family:'Share Tech Mono',monospace;font-size:9px;
           background:var(--g5);border:none;border-right:1px solid var(--g3);
           border-bottom:2px solid var(--g);color:var(--g);cursor:pointer;letter-spacing:1px">VG</button>
         <button id="tab-db" onclick="switchTab('db')"
-          style="flex:1;padding:6px;font-family:'Share Tech Mono',monospace;font-size:10px;
+          style="flex:1;padding:5px 2px;font-family:'Share Tech Mono',monospace;font-size:9px;
           background:var(--g4);border:none;border-right:1px solid var(--g3);
-          border-bottom:2px solid transparent;color:var(--g3);cursor:pointer;letter-spacing:1px">DAGBLADET</button>
+          border-bottom:2px solid transparent;color:var(--g3);cursor:pointer;letter-spacing:1px">NRK</button>
         <button id="tab-tv2" onclick="switchTab('tv2')"
-          style="flex:1;padding:6px;font-family:'Share Tech Mono',monospace;font-size:10px;
-          background:var(--g4);border:none;
+          style="flex:1;padding:5px 2px;font-family:'Share Tech Mono',monospace;font-size:9px;
+          background:var(--g4);border:none;border-right:1px solid var(--g3);
           border-bottom:2px solid transparent;color:var(--g3);cursor:pointer;letter-spacing:1px">TV 2</button>
+        <button id="tab-na" onclick="switchTab('na')"
+          style="flex:1;padding:5px 2px;font-family:'Share Tech Mono',monospace;font-size:9px;
+          background:var(--g4);border:none;border-right:1px solid var(--g3);
+          border-bottom:2px solid transparent;color:var(--g3);cursor:pointer;letter-spacing:1px">NETT.</button>
+        <button id="tab-ap" onclick="switchTab('ap')"
+          style="flex:1;padding:5px 2px;font-family:'Share Tech Mono',monospace;font-size:9px;
+          background:var(--g4);border:none;
+          border-bottom:2px solid transparent;color:var(--g3);cursor:pointer;letter-spacing:1px">AP</button>
       </div>
       <div id="vg-body"><div class="loading"><div class="spinner"></div>HENTER…</div></div>
     </div>
@@ -1068,17 +1076,19 @@ async function loadIncidents() {
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 // ─── NYHETER MED TABS ────────────────────────────────────────────────────────
 let activeTab = "vg";
-const newsCache = { vg: null, db: null, tv2: null };
+const newsCache = { vg: null, db: null, tv2: null, na: null, ap: null };
 const newsEndpoints = {
-  vg:  { url: "/api/vgnyheter",  label: "VG.no",       color: "#ff6b35" },
-  db:  { url: "/api/dagbladet",  label: "Dagbladet.no", color: "#e63946" },
-  tv2: { url: "/api/tv2",        label: "TV2.no",       color: "#0077cc" },
+  vg:  { url: "/api/vgnyheter",   label: "VG.no",          color: "#ff6b35" },
+  db:  { url: "/api/dagbladet",   label: "NRK.no",          color: "#cc0000" },
+  tv2: { url: "/api/tv2",         label: "TV2.no",          color: "#0077cc" },
+  na:  { url: "/api/nettavisen",  label: "Nettavisen.no",   color: "#ff9500" },
+  ap:  { url: "/api/aftenposten", label: "Aftenposten.no",  color: "#005b99" },
 };
 
 function switchTab(tab) {
   activeTab = tab;
   // Update tab styles
-  ["vg","db","tv2"].forEach(t => {
+  ["vg","db","tv2","na","ap"].forEach(t => {
     const btn = el("tab-" + t);
     if (!btn) return;
     if (t === tab) {
@@ -1163,7 +1173,7 @@ loadDepartures();
 loadWeather();
 loadAirQuality();
 loadPolice();
-fetchNews('vg'); fetchNews('db'); fetchNews('tv2');
+fetchNews('vg'); fetchNews('db'); fetchNews('tv2'); fetchNews('na'); fetchNews('ap');
 loadAmbassade();
 loadTravelTimes();
 loadCamerasDatex();

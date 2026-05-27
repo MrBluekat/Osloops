@@ -567,15 +567,47 @@ app.get("/api/vgnyheter", async (req, res) => {
   }
 });
 
-// ─── Dagbladet RSS ────────────────────────────────────────────────────────────
+// ─── NRK RSS ──────────────────────────────────────────────────────────────────
 app.get("/api/dagbladet", async (req, res) => {
   try {
-    const upstream = await fetch("https://www.dagbladet.no/rss", {
+    const upstream = await fetch("https://www.nrk.no/toppsaker.rss", {
       headers: { "User-Agent": "oslo-ops-center/1.0", "Accept": "application/rss+xml, text/xml" }
     });
-    if (!upstream.ok) throw new Error("Dagbladet svarte " + upstream.status);
+    if (!upstream.ok) throw new Error("NRK svarte " + upstream.status);
     const items = parseRssItems(await upstream.text(), 10);
-    console.log("Dagbladet: " + items.length + " saker");
+    console.log("NRK: " + items.length + " saker");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.json({ ok: true, items });
+  } catch (e) {
+    res.status(502).json({ ok: false, error: e.message, items: [] });
+  }
+});
+
+// ─── Nettavisen RSS ───────────────────────────────────────────────────────────
+app.get("/api/nettavisen", async (req, res) => {
+  try {
+    const upstream = await fetch("https://www.nettavisen.no/rss.xml", {
+      headers: { "User-Agent": "oslo-ops-center/1.0", "Accept": "application/rss+xml, text/xml" }
+    });
+    if (!upstream.ok) throw new Error("Nettavisen svarte " + upstream.status);
+    const items = parseRssItems(await upstream.text(), 10);
+    console.log("Nettavisen: " + items.length + " saker");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.json({ ok: true, items });
+  } catch (e) {
+    res.status(502).json({ ok: false, error: e.message, items: [] });
+  }
+});
+
+// ─── Aftenposten RSS ──────────────────────────────────────────────────────────
+app.get("/api/aftenposten", async (req, res) => {
+  try {
+    const upstream = await fetch("https://www.aftenposten.no/rss", {
+      headers: { "User-Agent": "oslo-ops-center/1.0", "Accept": "application/rss+xml, text/xml" }
+    });
+    if (!upstream.ok) throw new Error("Aftenposten svarte " + upstream.status);
+    const items = parseRssItems(await upstream.text(), 10);
+    console.log("Aftenposten: " + items.length + " saker");
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.json({ ok: true, items });
   } catch (e) {
