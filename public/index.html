@@ -148,7 +148,6 @@
   #map-nokey a{color:var(--g);font-size:9px;text-decoration:none;text-shadow:var(--glow)}
 
   /* ── DEPARTURES ── */
-  #dep-panel{grid-column:2;grid-row:1;align-self:start}
   .dep-row{display:grid;grid-template-columns:30px 1fr 50px;gap:8px;align-items:center;
     padding:8px 10px;border-bottom:1px solid rgba(0,100,30,.4);transition:background .15s}
   .dep-row:last-child{border-bottom:none}
@@ -164,7 +163,6 @@
   .t-later{color:var(--g3)}
 
   /* ── SIDEBAR ── */
-  #sidebar{grid-column:2;grid-row:2;display:flex;flex-direction:column;gap:8px;align-self:start}
 
   /* ── WEATHER ── */
   .w-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--g3);
@@ -184,7 +182,6 @@
   .aq-src{padding:2px 10px 8px;font-size:8px;color:var(--g3)}
 
   /* ── CAMERAS ── */
-  #cam-panel{grid-column:1;grid-row:1;align-self:start}
   .cam-section-label{
     font-size:9px;letter-spacing:2px;color:var(--g3);text-transform:uppercase;
     padding:6px 8px 4px;display:flex;align-items:center;gap:6px;
@@ -256,8 +253,6 @@
     filter:saturate(.6) contrast(1.15)}
 
   /* ── TRAVEL TIMES ── */
-  #travel-panel{grid-column:2;grid-row:3;align-self:start}
-  #dep-panel-wrap{grid-column:1;grid-row:1}
   .tv-row{display:flex;justify-content:space-between;align-items:center;
     padding:8px 12px;border-bottom:1px solid rgba(0,100,30,.4)}
   .tv-row:last-child{border-bottom:none}
@@ -268,7 +263,6 @@
   .d-ok{color:var(--g)} .d-warn{color:var(--yel)} .d-bad{color:var(--red)}
 
   /* ── POLICE / INCIDENTS ── */
-  #police-panel{grid-column:1;grid-row:2;align-self:start}
   .pol-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
     gap:8px;padding:10px}
   .pol-item{border-radius:0 2px 2px 0;padding:8px 10px;transition:filter .15s;cursor:pointer}
@@ -286,8 +280,8 @@
   }
   @media(max-width:800px){
     #grid{grid-template-columns:1fr}
-    #map-panel,#dep-panel,#sidebar,#cam-panel,#travel-panel,#police-panel{
-      grid-column:1!important;grid-row:auto!important}
+    #grid{flex-direction:column}
+    #right-col{width:100%}
   }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.7/hls.min.js"></script>
@@ -317,7 +311,7 @@
 
 <div id="grid">
 
-  <!-- MAP MODAL -->
+  <!-- MAP MODAL (fixed overlay, outside flow) -->
   <div id="map-modal">
     <div id="map-modal-inner">
       <div id="map-modal-head">
@@ -343,72 +337,70 @@
     </div>
   </div>
 
-  <!-- DEPARTURES -->
-  <div class="panel" id="dep-panel">
-    <div class="panel-glow"></div>
-    <div class="panel-head">
-      <span class="panel-title" id="dep-title">⟳ MAKRELLBEKKEN DEPARTURES</span>
-      <div class="panel-actions">
-        <button class="btn" onclick="loadDepartures()">↻</button>
-        <span class="badge badge-green">ENTUR LIVE</span>
-      </div>
-    </div>
-    <div id="dep-body"><div class="loading"><div class="spinner"></div>FETCHING…</div></div>
-  </div>
-
-  <!-- SIDEBAR -->
-  <div id="sidebar">
-    <!-- WEATHER -->
-    <div class="panel">
+  <!-- LEFT COLUMN: cameras → police → incidents (stacked, no gaps) -->
+  <div id="left-col">
+    <div class="panel" id="cam-panel">
       <div class="panel-glow"></div>
       <div class="panel-head">
-        <span class="panel-title">◈ WEATHER — OSLO</span>
-        <span class="badge badge-blue">MET.NO</span>
+        <span class="panel-title">◉ TRAFFIC CAMERAS — OSLO</span>
+        <span class="badge badge-blue">VEGVESEN</span>
       </div>
-      <div id="weather-body"><div class="loading"><div class="spinner"></div>LOADING…</div></div>
+      <div id="cam-grid"></div>
     </div>
-    <!-- AIR QUALITY -->
-    <div class="panel">
+    <div class="panel" id="police-panel">
       <div class="panel-glow"></div>
       <div class="panel-head">
-        <span class="panel-title">◎ AIR QUALITY — OSLO</span>
-        <span class="badge badge-blue">OPEN-METEO</span>
+        <span class="panel-title">⚠ OSLO POLITILOGGEN — OPERATIVE MELDINGER</span>
+        <div class="panel-actions">
+          <button class="btn" onclick="loadPolice()">↻</button>
+          <span class="badge badge-purple">POLITIET RSS</span>
+        </div>
       </div>
-      <div id="aq-body"><div class="loading"><div class="spinner"></div>LOADING…</div></div>
+      <div id="police-body"><div class="loading"><div class="spinner"></div>FETCHING…</div></div>
     </div>
+    <!-- incidents injected here by JS -->
+    <div id="incidents-wrapper"></div>
   </div>
 
-  <!-- CAMERAS -->
-  <div class="panel" id="cam-panel">
-    <div class="panel-glow"></div>
-    <div class="panel-head">
-      <span class="panel-title">◉ TRAFFIC CAMERAS — OSLO</span>
-      <span class="badge badge-blue">VEGVESEN</span>
+  <!-- RIGHT COLUMN: departures → travel → weather → AQ (stacked, no gaps) -->
+  <div id="right-col">
+    <div class="panel" id="dep-panel">
+      <div class="panel-glow"></div>
+      <div class="panel-head">
+        <span class="panel-title" id="dep-title">⟳ MAKRELLBEKKEN DEPARTURES</span>
+        <div class="panel-actions">
+          <button class="btn" onclick="loadDepartures()">↻</button>
+          <span class="badge badge-green">ENTUR LIVE</span>
+        </div>
+      </div>
+      <div id="dep-body"><div class="loading"><div class="spinner"></div>FETCHING…</div></div>
     </div>
-    <div id="cam-grid"></div>
-  </div>
-
-  <!-- TRAVEL TIMES -->
-  <div class="panel" id="travel-panel">
-    <div class="panel-glow"></div>
-    <div class="panel-head">
-      <span class="panel-title">⏱ TRAVEL TIMES</span>
-      <span class="badge badge-blue">VEGVESEN</span>
+    <div class="panel" id="travel-panel">
+      <div class="panel-glow"></div>
+      <div class="panel-head">
+        <span class="panel-title">⏱ TRAVEL TIMES</span>
+        <span class="badge badge-blue">VEGVESEN</span>
+      </div>
+      <div id="travel-body"><div class="loading"><div class="spinner"></div>LOADING…</div></div>
     </div>
-    <div id="travel-body"><div class="loading"><div class="spinner"></div>LOADING…</div></div>
-  </div>
-
-  <!-- POLICE -->
-  <div class="panel" id="police-panel">
-    <div class="panel-glow"></div>
-    <div class="panel-head">
-      <span class="panel-title">⚠ OSLO POLITILOGGEN — OPERATIVE MELDINGER</span>
-      <div class="panel-actions">
-        <button class="btn" onclick="loadPolice()">↻</button>
-        <span class="badge badge-purple">POLITIET RSS</span>
+    <div id="sidebar">
+      <div class="panel">
+        <div class="panel-glow"></div>
+        <div class="panel-head">
+          <span class="panel-title">◈ WEATHER — OSLO</span>
+          <span class="badge badge-blue">MET.NO</span>
+        </div>
+        <div id="weather-body"><div class="loading"><div class="spinner"></div>LOADING…</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-glow"></div>
+        <div class="panel-head">
+          <span class="panel-title">◎ AIR QUALITY — OSLO</span>
+          <span class="badge badge-blue">OPEN-METEO</span>
+        </div>
+        <div id="aq-body"><div class="loading"><div class="spinner"></div>LOADING…</div></div>
       </div>
     </div>
-    <div id="police-body"><div class="loading"><div class="spinner"></div>FETCHING…</div></div>
   </div>
 
 </div><!-- /grid -->
@@ -1018,7 +1010,7 @@ async function loadIncidents() {
       const panel = document.createElement("div");
       panel.id = "incidents-panel";
       panel.className = "panel";
-      panel.style.cssText = "grid-column:1;grid-row:3;align-self:start";
+      panel.style.cssText = "";
       panel.innerHTML = `<div class="panel-glow"></div>
         <div class="panel-head">
           <span class="panel-title">🚧 VEGVESEN HENDELSER — LIVE</span>
@@ -1026,7 +1018,7 @@ async function loadIncidents() {
         </div>
         <div class="pol-grid" id="incidents-body"></div>
         <div class="pol-src">Kilde: Statens vegvesen DATEX II · NLOD</div>`;
-      el("police-panel").insertAdjacentElement("afterend", panel);
+      const w = el("incidents-wrapper"); if(w){w.appendChild(panel);}else{el("police-panel").insertAdjacentElement("afterend",panel);}
     }
     el("incidents-body").innerHTML = items;
   } catch(e) {
