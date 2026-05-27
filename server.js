@@ -320,7 +320,7 @@ app.get("/cameras", async (req, res) => {
 
     console.log(`Kameraer i Oslo: ${cameras.length}`);
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.json({ ok: true, count: cameras.length, cameras: cameras.slice(0, 20) });
+    res.json({ ok: true, count: cameras.length, cameras: cameras });
   } catch (e) {
     console.error("Camera error:", e.message);
     res.status(502).json({ ok: false, error: e.message, cameras: [] });
@@ -437,7 +437,7 @@ app.get("/camerasfull", async (req, res) => {
     }
 
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.json({ ok: true, count: cameras.length, cameras: cameras.slice(0, 20) });
+    res.json({ ok: true, count: cameras.length, cameras: cameras });
   } catch (e) {
     res.status(502).json({ ok: false, error: e.message, cameras: [] });
   }

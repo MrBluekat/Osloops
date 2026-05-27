@@ -797,7 +797,7 @@ async function loadCamerasDatex() {
   try {
     const res  = await fetch("/camerasfull");
     const data = await res.json();
-    console.log("Cameras returned:", data.count, "cameras:", data.cameras?.length);
+    console.log("Cameras:", data.count, "returned:", data.cameras?.length, "live:", data.cameras?.filter(c=>c.videoUrl).length, "still:", data.cameras?.filter(c=>!c.videoUrl).length);
     if (!data.ok || !data.cameras?.length) throw new Error(data.error || "No cameras");
     renderCamGridFull(data.cameras);
   } catch(e) {
