@@ -134,18 +134,11 @@ app.get("/debug/cameravideo", async (req, res) => {
 
     lines.sort((a, b) => b.startsWith("✓") - a.startsWith("✓") || a.localeCompare(b, "no"));
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    res.send(
-      "Oslo-kameraer med videofeed:
-" +
-      "=".repeat(80) + "
-" +
-      lines.join("
-") + "
-
-" +
-      "Totalt: " + lines.length + " kameraer (" +
-      lines.filter(l => l.startsWith("✓")).length + " med video, " +
-      lines.filter(l => l.startsWith("✗")).length + " kun bilde)"
+    const sep = "=".repeat(80);
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    const videoCount = lines.filter(l => l.startsWith("\u2713")).length;
+    const imgCount   = lines.filter(l => l.startsWith("\u2717")).length;
+    res.send("Oslo-kameraer med videofeed:\n" + sep + "\n" + lines.join("\n") + "\n\nTotalt: " + lines.length + " kameraer (" + videoCount + " med video, " + imgCount + " kun bilde)");
     );
   } catch (e) {
     res.status(502).send("Feil: " + e.message);
