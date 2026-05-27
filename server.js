@@ -521,6 +521,34 @@ app.get("/api/politiloggen", async (req, res) => {
   }
 });
 
+// ─── Helper: parse RSS item tags safely ──────────────────────────────────────
+function rssTag(block, tagName) {
+  // Try CDATA first, then plain text
+  const cdataRe = new RegExp('<' + tagName + '[^>]*>\\s*<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>\\s*<\\/' + tagName + '>', 'i');
+  const plainRe = new RegExp('<' + tagName + '[^>]*>([^<]*)<\\/' + tagName + '>', 'i');
+  const m = block.match(cdataRe) || block.match(plainRe);
+  return m ? m[1].trim() : '';
+}
+
+function parseRssItems(xml, limit) {
+  const items = [];
+  const re = /<item>([\s\S]*?)<\/item>/gi;
+  let m;
+  while ((m = re.exec(xml)) !== null && items.length < limit) {
+    const b = m[1];
+    const title = rssTag(b, 'title');
+    if (title) {
+      items.push({
+        title,
+        date:   rssTag(b, 'pubDate'),
+        url:    rssTag(b, 'link') || rssTag(b, 'guid'),
+        desc:   rssTag(b, 'description'),
+      });
+    }
+  }
+  return items;
+}
+
 // ─── VG Nyheter RSS ───────────────────────────────────────────────────────────
 app.get("/api/vgnyheter", async (req, res) => {
   try {
@@ -528,18 +556,8 @@ app.get("/api/vgnyheter", async (req, res) => {
       headers: { "User-Agent": "oslo-ops-center/1.0", "Accept": "application/rss+xml, text/xml" }
     });
     if (!upstream.ok) throw new Error("VG svarte " + upstream.status);
-    const xml  = await upstream.text();
-    const items = [];
-    for (const m of [...xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)].slice(0, 10)) {
-      const b = m[1];
-      const tag = t => {
-        const r = b.match(new RegExp("<" + t + "[^>]*><!\[CDATA\[([\s\S]*?)\]\]><\/" + t + ">")) ||
-                  b.match(new RegExp("<" + t + "[^>]*>([\s\S]*?)<\/" + t + ">"));
-        return r ? r[1].trim() : "";
-      };
-      const title = tag("title");
-      if (title) items.push({ title, date: tag("pubDate"), url: tag("link") || tag("guid") });
-    }
+    const xml   = await upstream.text();
+    const items = parseRssItems(xml, 10);
     console.log("VG nyheter: " + items.length + " saker");
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.json({ ok: true, items });
@@ -549,11 +567,12 @@ app.get("/api/vgnyheter", async (req, res) => {
   }
 });
 
-// ─── Ambassade-nyhetsvarsel — søker i norske RSS-feeds ────────────────────────
+// ─── Ambassade-nyhetsvarsel ────────────────────────────────────────────────────
+// Søker RSS-feeds fra de siste 7 dagene (RSS inneholder typisk siste 30-50 saker)
 const EMBASSY_KEYWORDS = [
   "amerikanske ambassaden", "amerikas ambassade", "usas ambassade",
   "den amerikanske ambassaden", "usa-ambassaden", "us-ambassaden",
-  "american embassy", "us embassy oslo"
+  "american embassy", "us embassy oslo",
 ];
 
 const NEWS_FEEDS = [
@@ -571,38 +590,26 @@ app.get("/api/ambassade", async (req, res) => {
     try {
       const r = await fetch(feedUrl, {
         headers: { "User-Agent": "oslo-ops-center/1.0", "Accept": "application/rss+xml, text/xml" },
-        signal: AbortSignal.timeout(5000)
+        signal: AbortSignal.timeout(6000),
       });
       if (!r.ok) return;
-      const xml = await r.text();
+      const xml    = await r.text();
       const source = feedUrl.match(/\/\/(www\.)?([^/]+)/)?.[2] || feedUrl;
-      for (const m of [...xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)]) {
-        const b = m[1];
-        const tag = t => {
-          const r2 = b.match(new RegExp("<" + t + "[^>]*><!\[CDATA\[([\s\S]*?)\]\]><\/" + t + ">")) ||
-                     b.match(new RegExp("<" + t + "[^>]*>([\s\S]*?)<\/" + t + ">"));
-          return r2 ? r2[1].trim() : "";
-        };
-        const title = tag("title");
-        const desc  = tag("description");
-        const combined = (title + " " + desc).toLowerCase();
+      const items  = parseRssItems(xml, 100);
+      for (const item of items) {
+        const combined = (item.title + " " + item.desc).toLowerCase();
         if (EMBASSY_KEYWORDS.some(kw => combined.includes(kw))) {
-          results.push({
-            title,
-            date:   tag("pubDate"),
-            url:    tag("link") || tag("guid"),
-            source,
-          });
+          results.push({ title: item.title, date: item.date, url: item.url, source });
         }
       }
     } catch (_) {}
   }));
-  // Sort newest first
-  results.sort((a, b) => new Date(b.date||0) - new Date(a.date||0));
+  results.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
   console.log("Ambassade-varsel: " + results.length + " treff");
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.json({ ok: true, count: results.length, items: results.slice(0, 10) });
+  res.json({ ok: true, count: results.length, items: results.slice(0, 15) });
 });
+
 
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
