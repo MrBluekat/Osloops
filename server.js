@@ -586,12 +586,12 @@ app.get("/api/dagbladet", async (req, res) => {
 // ─── Nettavisen RSS ───────────────────────────────────────────────────────────
 app.get("/api/nettavisen", async (req, res) => {
   try {
-    const upstream = await fetch("https://www.nettavisen.no/rss/", {
+    const upstream = await fetch("https://e24.no/rss", {
       headers: { "User-Agent": "oslo-ops-center/1.0", "Accept": "application/rss+xml, text/xml" }
     });
     if (!upstream.ok) throw new Error("Nettavisen svarte " + upstream.status);
     const items = parseRssItems(await upstream.text(), 10);
-    console.log("Nettavisen: " + items.length + " saker");
+    console.log("E24: " + items.length + " saker");
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.json({ ok: true, items });
   } catch (e) {
@@ -645,7 +645,7 @@ const NEWS_FEEDS = [
   "https://www.nrk.no/toppsaker.rss",
   "https://www.dagbladet.no/rss",
   "https://www.tv2.no/rss/nyheter",
-  "https://www.nettavisen.no/rss/",
+  "https://e24.no/rss",
 ];
 
 app.get("/api/ambassade", async (req, res) => {
