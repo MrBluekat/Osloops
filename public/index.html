@@ -1312,23 +1312,40 @@ function toggleFullscreen() {
 }
 
 // ─── ROAD CONDITIONS ──────────────────────────────────────────────────────────
-// Station ID → location name mapping for known Oslo-area stations
+// Station ID → location name mapping
+// IDs confirmed from /debug/roadweather — Oslo-area stations only
 const ROAD_STATION_NAMES = {
-  "1629006": "Lierskogen",
-  "729002":  "Grelland",
-  "229005":  "Gjelleråsen",
-  "329004":  "Furuset",
-  "329002":  "Hjortnes",
-  "229006":  "Skui",
-  "629017":  "Sollihøgda",
-  "329031":  "Sandstuveien",
-  "229009":  "Sandvika",
-  "329007":  "Fiskevollbukta",
-  "629001":  "Lierskogen",
-  "329034":  "Ullevål",
-  "329003":  "Linderud",
-  "229013":  "Vestby",
-  "84001":   "Nøstvett",
+  // Confirmed from stillcam/camera debug
+  "1629006": "Lierskogen (E18)",
+  "1629013": "Lierskogen (E18 vest)",
+  "1629004": "Lier (E18)",
+  "1629001": "Lier vest (E18)",
+  "1629009": "Heggedal (E18)",
+  "729002":  "Grelland (E18)",
+  "729009":  "Grelland sør (E18)",
+  "229005":  "Gjelleråsen (RV4)",
+  "329004":  "Furuset (E6)",
+  "329002":  "Hjortnes (E18)",
+  "229006":  "Skui (E16)",
+  "629017":  "Sollihøgda (E16)",
+  "329031":  "Sandstuveien (E6)",
+  "229009":  "Sandvika (E18)",
+  "329007":  "Fiskevollbukta (E18)",
+  "629001":  "Lierskogen (E18 øst)",
+  "329034":  "Ullevål (Ring 3)",
+  "329003":  "Linderud (RV4)",
+  "229013":  "Vestby (E6)",
+  "3000084": "Nøstvett (E6)",
+  "229001":  "Holstad (E18)",
+  "329002":  "Hjortnes (E18)",
+  "229017":  "Svartskog (E6)",
+  "3000816": "Hallingby (E16)",
+  "3000682": "Olum (E16)",
+  "129015":  "Smaalenenes bru (E18)",
+  "729012":  "Grelland (E18)",
+  "3000908": "Kløfta (E6)",
+  "529016":  "Romeriksåsen (E16)",
+  "3000417": "Taraldrud (E6)",
 };
 function stationName(id) {
   return ROAD_STATION_NAMES[id] || ROAD_STATION_NAMES[id.replace(/^0+/, "")] || "Stasjon " + id;
