@@ -714,10 +714,9 @@ function getIndex() {
 app.get("*", (_req, res) => {
   const gmKey = process.env.GM_KEY || "";
   if (!gmKey) return res.sendFile(path.join(__dirname, "public", "index.html"));
-  // Inject the key so the page auto-initialises Google Maps without user input
-  const marker = 'const savedKey = localStorage.getItem("gm_key");' ;
-  const inject = 'const savedKey = "' + gmKey + '" || localStorage.getItem("gm_key");' ;
-  const html   = getIndex().replace(marker, inject);
+  // Inject GM_SERVER_KEY as a JS variable before all other scripts
+  const snippet = '<script>window.GM_SERVER_KEY="' + gmKey + '";</script>';
+  const html = getIndex().replace("</head>", snippet + "</head>");
   res.setHeader("Content-Type", "text/html");
   res.send(html);
 });

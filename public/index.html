@@ -488,7 +488,7 @@ let gmapInstance = null;
 function openMapModal() {
   el("map-modal").classList.add("open");
   // Use injected server key, or localStorage fallback
-  const key = (typeof GM_SERVER_KEY !== "undefined" && GM_SERVER_KEY) || localStorage.getItem("gm_key");
+  const key = window.GM_SERVER_KEY || localStorage.getItem("gm_key");
   if (key && !gmapInstance) loadGoogleMap(key);
 }
 function closeMapModal() {
@@ -588,7 +588,7 @@ function loadGoogleMap(key) {
 }
 
 // Init map on load if key exists
-const savedKey = localStorage.getItem("gm_key");
+const savedKey = window.GM_SERVER_KEY || localStorage.getItem("gm_key");
 if (savedKey) {
   loadGoogleMap(savedKey);
 } else {
