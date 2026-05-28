@@ -944,9 +944,10 @@ const CAM_NAMES_PARTIAL = {
 function getCamName(cam) {
   // Try ID match first (most reliable)
   if (cam.videoUrl || cam.imgUrl) {
-    // Decode URL-encoded imgUrl (e.g. %2Fimages%2F0229005_1 → /images/0229005_1)
-    const rawUrl = cam.videoUrl || cam.imgUrl || "";
-    const url    = decodeURIComponent(rawUrl);
+    // imgUrl may be double-encoded — decode until stable
+    let url = cam.videoUrl || cam.imgUrl || "";
+    try { url = decodeURIComponent(url); } catch(_) {}
+    try { url = decodeURIComponent(url); } catch(_) {}
     const idMatch = url.match(/\/([^/]+)\/manifest\.m3u8/) ||
                     url.match(/\/images\/([^/?&\s]+)/);
     const id = idMatch ? idMatch[1] : null;
@@ -985,7 +986,7 @@ function openCamModal(name, videoUrl) {
   video.src = "";
 
   if (Hls.isSupported()) {
-    modalHls = new Hls({ lowLatencyMode: true, maxBufferLength: 15 });
+    modalHls = new Hls({ lowLatencyMode: false, maxBufferLength: 30, maxMaxBufferLength: 60, enableWorker: true });
     modalHls.loadSource(videoUrl);
     modalHls.attachMedia(video);
     modalHls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
@@ -1056,7 +1057,7 @@ function renderCamGridFull(cameras) {
     const video = el("camvid-" + i);
     if (!video) return;
     if (Hls.isSupported()) {
-      const hls = new Hls({ lowLatencyMode: true, maxBufferLength: 8, autoStartLoad: true });
+      const hls = new Hls({ lowLatencyMode: false, maxBufferLength: 30, maxMaxBufferLength: 60, enableWorker: true });
       hls.loadSource(c.videoUrl);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
