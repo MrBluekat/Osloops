@@ -1241,6 +1241,27 @@ function refreshNews() {
 }
 
 // ─── AMBASSADE-VARSEL ─────────────────────────────────────────────────────────
+let lastAmbCount = 0;
+
+function playAlertSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    // Three short beeps — classic alert pattern
+    [0, 0.25, 0.5].forEach(delay => {
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0, ctx.currentTime + delay);
+      gain.gain.linearRampToValueAtTime(0.4, ctx.currentTime + delay + 0.02);
+      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + delay + 0.18);
+      osc.start(ctx.currentTime + delay);
+      osc.stop(ctx.currentTime + delay + 0.2);
+    });
+  } catch(e) {}
+}
 async function loadAmbassade() {
   el("amb-body").innerHTML = '<div class="loading"><div class="spinner"></div>SØKER NORSKE MEDIER…</div>';
   try {
@@ -1251,6 +1272,9 @@ async function loadAmbassade() {
       el("amb-body").innerHTML = '<div class="loading" style="color:var(--g3)">Ingen treff akkurat nå · Søker etter: amerikanske ambassaden, USAs ambassade</div>';
       return;
     }
+    // Play alert sound if new items appeared since last check
+    if (data.items.length > lastAmbCount && lastAmbCount >= 0) playAlertSound();
+    lastAmbCount = data.items.length;
     el("amb-body").innerHTML = data.items.map(item => {
       const dt = item.date ? new Date(item.date).toLocaleString("no-NO",
         {timeZone:"Europe/Oslo",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}) : "";
