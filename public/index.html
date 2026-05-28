@@ -39,6 +39,13 @@
   body.day-theme .cam-card{ background:#fff }
   body.day-theme .cam-card-live{ background:#fff }
   body.day-theme::after{ display:none }
+  /* Fix news tab backgrounds in day theme */
+  body.day-theme #tab-vg,
+  body.day-theme #tab-db,
+  body.day-theme #tab-tv2,
+  body.day-theme #tab-na,
+  body.day-theme #tab-ap{ background:#e8f5e8 !important;color:var(--g) !important }
+  body.day-theme .pol-item{ background:#f8fff8 !important }
   *{box-sizing:border-box;margin:0;padding:0}
   body{
     background:#000;
@@ -324,20 +331,20 @@
       ▣ TRAFFIC MAP
     </button>
   </div>
-  <div style="display:flex;align-items:center;gap:8px">
-    <button onclick="toggleTheme()" id="theme-btn" title="Bytt tema"
-      style="background:rgba(0,255,65,.08);border:1px solid var(--g3);color:var(--g);
-      font-family:'Share Tech Mono',monospace;font-size:11px;padding:4px 10px;
-      cursor:pointer;border-radius:1px;letter-spacing:1px;transition:all .15s">☀</button>
-    <button onclick="toggleFullscreen()" title="Fullskjerm"
-      style="background:rgba(0,255,65,.08);border:1px solid var(--g3);color:var(--g);
-      font-family:'Share Tech Mono',monospace;font-size:11px;padding:4px 10px;
-      cursor:pointer;border-radius:1px;letter-spacing:1px;transition:all .15s">⛶</button>
-  </div>
   <div class="meta-row">
     <div class="meta-item"><strong class="meta-val" id="clock">--:--:--</strong>LOCAL TIME</div>
     <div class="meta-item"><strong class="meta-val">OSLO, NO</strong>59.94°N 10.67°E</div>
     <div class="meta-item"><span class="live-dot"></span><strong class="meta-val">LIVE</strong>MONITORING</div>
+    <div style="display:flex;gap:6px;align-items:center;margin-left:8px">
+      <button onclick="toggleTheme()" id="theme-btn"
+        style="background:rgba(0,255,65,.08);border:1px solid var(--g3);color:var(--g);
+        font-family:'Share Tech Mono',monospace;font-size:9px;padding:5px 12px;
+        cursor:pointer;border-radius:1px;letter-spacing:2px;transition:all .15s">DAY MODE</button>
+      <button onclick="toggleFullscreen()"
+        style="background:rgba(0,255,65,.08);border:1px solid var(--g3);color:var(--g);
+        font-family:'Share Tech Mono',monospace;font-size:9px;padding:5px 12px;
+        cursor:pointer;border-radius:1px;letter-spacing:2px;transition:all .15s">FULLSCREEN</button>
+    </div>
   </div>
 </div>
 
@@ -1260,13 +1267,15 @@ async function loadAmbassade() {
 // ─── THEME TOGGLE ─────────────────────────────────────────────────────────────
 function toggleTheme() {
   const isDay = document.body.classList.toggle("day-theme");
-  el("theme-btn").textContent = isDay ? "🌙" : "☀";
+  el("theme-btn").textContent = isDay ? "NIGHT MODE" : "DAY MODE";
   localStorage.setItem("theme", isDay ? "day" : "night");
 }
 // Restore saved theme
 if (localStorage.getItem("theme") === "day") {
   document.body.classList.add("day-theme");
-  document.addEventListener("DOMContentLoaded", () => { el("theme-btn").textContent = "🌙"; });
+  document.addEventListener("DOMContentLoaded", () => {
+    if (el("theme-btn")) el("theme-btn").textContent = "NIGHT MODE";
+  });
 }
 
 // ─── FULLSCREEN ───────────────────────────────────────────────────────────────
