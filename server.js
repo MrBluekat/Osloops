@@ -3,6 +3,7 @@ import fetch from "node-fetch";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
+import { readFileSync } from "fs";
 
 dotenv.config();
 const app  = express();
@@ -705,7 +706,6 @@ app.get("/api/ambassade", async (req, res) => {
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
 // ─── Catch-all → index.html (injects GM key from env) ───────────────────────
-import { readFileSync } from "fs";
 let _indexHtml = null;
 function getIndex() {
   if (!_indexHtml) _indexHtml = readFileSync(path.join(__dirname, "public", "index.html"), "utf8");
