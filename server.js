@@ -4,12 +4,73 @@ import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 import { readFileSync } from "fs";
+import { createHash } from "crypto";
 
 dotenv.config();
 const app  = express();
 const PORT = process.env.PORT || 3000;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+// ─── Password protection ─────────────────────────────────────────────────────
+const SITE_PASSWORD = process.env.SITE_PASSWORD || "";
+
+function checkAuth(req, res, next) {
+  if (!SITE_PASSWORD) return next(); // no password set — open access
+  // Check cookie
+  const cookies = Object.fromEntries(
+    (req.headers.cookie || "").split(";").map(c => c.trim().split("=").map(decodeURIComponent))
+  );
+  const token = createHash("sha256").update(SITE_PASSWORD).digest("hex");
+  if (cookies["auth"] === token) return next();
+  // Not authenticated — serve login page
+  res.setHeader("Content-Type", "text/html");
+  res.send(`<!DOCTYPE html><html><head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Oslo Ops Center — Login</title>
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{background:#000;color:#00ff41;font-family:'Courier New',monospace;
+        display:flex;align-items:center;justify-content:center;min-height:100vh}
+      .box{border:1px solid #007a20;padding:40px;width:320px;text-align:center}
+      .logo{font-size:18px;letter-spacing:4px;margin-bottom:8px;color:#00ff41}
+      .sub{font-size:10px;color:#007a20;letter-spacing:3px;margin-bottom:32px}
+      input{width:100%;background:#000;border:1px solid #007a20;color:#00ff41;
+        padding:10px;font-family:'Courier New',monospace;font-size:14px;
+        text-align:center;outline:none;margin-bottom:12px;letter-spacing:2px}
+      input:focus{border-color:#00ff41;box-shadow:0 0 8px rgba(0,255,65,.3)}
+      button{width:100%;background:rgba(0,255,65,.08);border:1px solid #007a20;
+        color:#00ff41;padding:10px;font-family:'Courier New',monospace;font-size:12px;
+        cursor:pointer;letter-spacing:3px;transition:all .15s}
+      button:hover{background:rgba(0,255,65,.18);border-color:#00ff41}
+      .err{color:#ff3838;font-size:11px;margin-top:8px;min-height:16px}
+    </style>
+  </head><body>
+    <div class="box">
+      <div class="logo">OSLO_OPS_CENTER</div>
+      <div class="sub">RESTRICTED ACCESS</div>
+      <form method="POST" action="/login">
+        <input type="password" name="password" placeholder="ENTER PASSWORD" autofocus>
+        <button type="submit">ACCESS SYSTEM</button>
+        <div class="err">${req.query.err ? "INCORRECT PASSWORD" : ""}</div>
+      </form>
+    </div>
+  </body></html>`);
+}
+
+app.use(express.urlencoded({ extended: false }));
+
+app.post("/login", (req, res) => {
+  const token = createHash("sha256").update(SITE_PASSWORD).digest("hex");
+  if (req.body.password === SITE_PASSWORD) {
+    res.setHeader("Set-Cookie", "auth=" + encodeURIComponent(token) + "; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000");
+    res.redirect("/");
+  } else {
+    res.redirect("/?err=1");
+  }
+});
+
+app.use(checkAuth);
 app.use(express.static(path.join(__dirname, "public")));
 
 const DATEX_BASE = "https://datex-server-get-v3-1.atlas.vegvesen.no/datexapi";
