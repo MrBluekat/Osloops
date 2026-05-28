@@ -712,6 +712,13 @@ app.get("/api/ambassade", async (req, res) => {
 });
 
 
+// ─── Google Maps key endpoint ────────────────────────────────────────────────
+app.get("/api/gmkey", (_req, res) => {
+  const key = process.env.GM_KEY || "";
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.json({ key });
+});
+
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
@@ -723,14 +730,7 @@ function getIndex() {
   return _indexHtml;
 }
 app.get("*", (_req, res) => {
-  const gmKey = process.env.GM_KEY || "";
-  const snippet = gmKey ? ('<script>window.GM_SERVER_KEY="' + gmKey + '";</script>') : '';
-  const base = getIndex();
-  const html = snippet ? base.replace("</head>", snippet + "</head>") : base;
-  const replaced = html.includes('GM_SERVER_KEY="' + gmKey + '"');
-  console.log("GM_KEY inject: key=" + !!gmKey + " replaced=" + replaced);
-  res.setHeader("Content-Type", "text/html");
-  res.send(html);
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
 app.listen(PORT, () => console.log(`Oslo Ops Center running on http://localhost:${PORT}`));
