@@ -350,7 +350,7 @@
     <div class="panel" id="police-panel">
       <div class="panel-glow"></div>
       <div class="panel-head">
-        <span class="panel-title">⚠ OSLO POLITILOGGEN — OPERATIVE MELDINGER</span>
+        <span class="panel-title">⚠ OSLO POLICE LOG — OPERATIONAL MESSAGES</span>
         <div class="panel-actions">
           <button class="btn" onclick="loadPolice()">↻</button>
           <span class="badge badge-purple">POLITIET RSS</span>
@@ -362,7 +362,7 @@
     <div class="panel" id="vg-panel">
       <div class="panel-glow"></div>
       <div class="panel-head">
-        <span class="panel-title">📰 NYHETER</span>
+        <span class="panel-title">📰 NEWS</span>
         <div class="panel-actions">
           <button class="btn" onclick="refreshNews()">↻</button>
         </div>
@@ -396,7 +396,7 @@
     <div class="panel" id="amb-panel">
       <div class="panel-glow"></div>
       <div class="panel-head">
-        <span class="panel-title">🚨 <span style="color:#ff3838;text-shadow:0 0 8px rgba(255,56,56,.6)">NEWS ALERT</span> — AMERIKAS AMBASSADE</span>
+        <span class="panel-title">🚨 <span style="color:#ff3838;text-shadow:0 0 8px rgba(255,56,56,.6)">NEWS ALERT</span> — US EMBASSY NORWAY <span style="color:var(--g3);font-size:8px">(LAST 24H)</span></span>
         <div class="panel-actions">
           <button class="btn" onclick="loadAmbassade()">↻</button>
           <span class="badge" style="background:rgba(255,56,56,.15);color:#ff3838;border:1px solid rgba(255,56,56,.3)">ALERT</span>
@@ -1060,7 +1060,7 @@ async function loadIncidents() {
       panel.style.cssText = "";
       panel.innerHTML = `<div class="panel-glow"></div>
         <div class="panel-head">
-          <span class="panel-title">🚧 VEGVESEN HENDELSER — LIVE</span>
+          <span class="panel-title">🚧 VEGVESEN INCIDENT REPORTS</span>
           <span class="badge badge-orange">DATEX II</span>
         </div>
         <div class="pol-grid" id="incidents-body"></div>
@@ -1163,7 +1163,7 @@ async function loadAmbassade() {
         '<div class="pol-meta"><span>' + dt + '</span>' +
         (item.source ? '<span class="pol-cat">' + item.source + '</span>' : '') + '</div>' +
         '<div class="pol-title">' + item.title + '</div></div>';
-    }).join("") + '<div class="pol-src">Søker: VG · Aftenposten · NRK · Dagbladet · TV2 · Nettavisen</div>';
+    }).join("") + '<div class="pol-src">Søker: VG · Aftenposten · NRK · E24 · TV2 · Dagbladet</div>';
   } catch(e) {
     el("amb-body").innerHTML = '<div class="loading err-text">⚠ ' + e.message + '</div>';
   }
