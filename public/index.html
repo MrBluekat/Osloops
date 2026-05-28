@@ -1331,18 +1331,43 @@ async function loadRoadWeather() {
     const data = await res.json();
     if (!data.ok || !data.stations?.length) throw new Error(data.error || "Ingen data");
 
-    el("road-body").innerHTML = '<div class="aq-grid">' +
-      data.stations.slice(0, 6).map(s => {
-        const cond  = roadCondLabel(s.roadCond);
-        const color = (s.roadCond||"").toLowerCase().includes("icy") || (s.roadCond||"").toLowerCase().includes("frost") || (s.roadCond||"").toLowerCase().includes("snowy")
-          ? "#ff9500" : "var(--g)";
-        return '<div class="aq-cell">' +
-          '<div class="aq-val" style="color:' + color + ';font-size:11px">' + (cond || "—") + '</div>' +
-          '<div class="aq-name">' + (s.roadTemp ? parseFloat(s.roadTemp).toFixed(1) + "°C vei" : (s.airTemp ? parseFloat(s.airTemp).toFixed(1) + "°C luft" : "")) + '</div>' +
-          '<div class="aq-lbl" style="color:var(--g3);font-size:8px">' + s.ref + '</div>' +
-          '</div>';
-      }).join("") +
-    '</div><div class="aq-src">Kilde: Statens vegvesen DATEX II</div>';
+    const rows = data.stations.map(s => {
+      const air   = s.airTemp  ? parseFloat(s.airTemp).toFixed(1)  : null;
+      const road  = s.roadTemp ? parseFloat(s.roadTemp).toFixed(1) : null;
+      const wind  = s.wind     ? parseFloat(s.wind).toFixed(1)     : null;
+      const rain  = s.precip   ? parseFloat(s.precip).toFixed(1)   : null;
+      const cond  = roadCondLabel(s.roadCond);
+
+      // Color road temp: below 0 = orange warning, below -5 = red
+      const roadColor = road === null ? "var(--g3)"
+        : parseFloat(road) < -5 ? "#ff3838"
+        : parseFloat(road) < 0  ? "#ff9500"
+        : "var(--g)";
+
+      // Road condition icon
+      const condIcon = !s.roadCond ? "" 
+        : s.roadCond.toLowerCase().includes("dry")   ? "🟢"
+        : s.roadCond.toLowerCase().includes("wet")   ? "🔵"
+        : s.roadCond.toLowerCase().includes("snow")  ? "⚪"
+        : s.roadCond.toLowerCase().includes("ic")    ? "🔴"
+        : s.roadCond.toLowerCase().includes("frost") ? "🟠"
+        : "⚫";
+
+      return `<div style="display:flex;justify-content:space-between;align-items:center;
+        padding:7px 12px;border-bottom:1px solid rgba(0,100,30,.3)">
+        <div style="font-size:9px;color:var(--g3);min-width:60px">ID ${s.ref}</div>
+        <div style="display:flex;gap:12px;align-items:center;flex:1;justify-content:center">
+          ${air  !== null ? `<span title="Lufttemperatur" style="font-size:11px">🌡 <span style="color:var(--g)">${air}°C</span></span>` : ""}
+          ${road !== null ? `<span title="Veibanetemperatur" style="font-size:11px">🛣 <span style="color:${roadColor}">${road}°C</span></span>` : ""}
+          ${wind !== null ? `<span title="Vindhastighet" style="font-size:11px">💨 <span style="color:var(--g)">${wind} m/s</span></span>` : ""}
+          ${rain !== null ? `<span title="Nedbør" style="font-size:11px">🌧 <span style="color:var(--g)">${rain} mm/t</span></span>` : ""}
+          ${cond ? `<span style="font-size:10px">${condIcon} <span style="color:var(--g)">${cond}</span></span>` : ""}
+        </div>
+      </div>`;
+    }).join("");
+
+    el("road-body").innerHTML = rows +
+      '<div class="pol-src">🌡 Luft · 🛣 Veibane · 💨 Vind · Kilde: Vegvesen DATEX II</div>';
   } catch(e) {
     el("road-body").innerHTML = '<div class="loading err-text">⚠ ' + e.message + '</div>';
   }
