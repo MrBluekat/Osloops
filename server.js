@@ -171,6 +171,16 @@ app.get("/debug/cameravideo", async (req, res) => {
   }
 });
 
+
+// ─── Debug: check env vars ────────────────────────────────────────────────────
+app.get("/debug/env", (_req, res) => {
+  res.json({
+    GM_KEY_SET: !!process.env.GM_KEY,
+    GM_KEY_LENGTH: (process.env.GM_KEY || "").length,
+    GM_KEY_PREVIEW: (process.env.GM_KEY || "").slice(0, 8) + "...",
+  });
+});
+
 // ─── Debug — visit /debug/cameras, /debug/travel, /debug/incidents, /debug/locations
 app.get("/debug/:name", async (req, res) => {
   const map = {
@@ -705,14 +715,6 @@ app.get("/api/ambassade", async (req, res) => {
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
-// ─── Debug: check env vars ────────────────────────────────────────────────────
-app.get("/debug/env", (_req, res) => {
-  res.json({
-    GM_KEY_SET: !!process.env.GM_KEY,
-    GM_KEY_LENGTH: (process.env.GM_KEY || "").length,
-    GM_KEY_PREVIEW: (process.env.GM_KEY || "").slice(0, 8) + "...",
-  });
-});
 
 // ─── Catch-all → index.html (injects GM key from env) ───────────────────────
 let _indexHtml = null;
