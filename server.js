@@ -724,10 +724,11 @@ function getIndex() {
 }
 app.get("*", (_req, res) => {
   const gmKey = process.env.GM_KEY || "";
-  if (!gmKey) return res.sendFile(path.join(__dirname, "public", "index.html"));
-  // Inject GM_SERVER_KEY as a JS variable before all other scripts
-  const snippet = '<script>window.GM_SERVER_KEY="' + gmKey + '";</script>';
-  const html = getIndex().replace("</head>", snippet + "</head>");
+  const snippet = gmKey ? ('<script>window.GM_SERVER_KEY="' + gmKey + '";</script>') : '';
+  const base = getIndex();
+  const html = snippet ? base.replace("</head>", snippet + "</head>") : base;
+  const replaced = html.includes('GM_SERVER_KEY="' + gmKey + '"');
+  console.log("GM_KEY inject: key=" + !!gmKey + " replaced=" + replaced);
   res.setHeader("Content-Type", "text/html");
   res.send(html);
 });
