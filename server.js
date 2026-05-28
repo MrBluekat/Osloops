@@ -764,6 +764,17 @@ app.get("/roadweather", async (req, res) => {
   }
 });
 
+// ─── Debug: road weather raw XML ─────────────────────────────────────────────
+app.get("/debug/roadweather", async (req, res) => {
+  try {
+    const xml = await datexGet("GetMeasuredWeatherData");
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.send(xml.slice(0, 5000));
+  } catch(e) {
+    res.status(502).send("Feil: " + e.message);
+  }
+});
+
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
