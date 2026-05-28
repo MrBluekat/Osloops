@@ -181,12 +181,24 @@ app.get("/debug/env", (_req, res) => {
   });
 });
 
-// ─── Debug: road weather raw XML ─────────────────────────────────────────────
+// ─── Debug: road weather station IDs ─────────────────────────────────────────
 app.get("/debug/roadweather", async (req, res) => {
   try {
     const xml = await datexGet("GetMeasuredWeatherData");
+    const records = [...xml.matchAll(/<siteMeasurements[^>]*>([\s\S]*?)<\/siteMeasurements>/gi)];
+    const lines = [];
+    const seen = new Set();
+    for (const rec of records) {
+      const block = rec[1];
+      const id = block.match(/measurementSiteReference[^>]+id="([^"]+)"/i)?.[1] || "?";
+      if (seen.has(id)) continue;
+      seen.add(id);
+      const air  = block.match(/<airTemperature><temperature>([^<]+)<\/temperature>/i)?.[1];
+      const road = block.match(/<roadSurfaceTemperature><temperature>([^<]+)<\/temperature>/i)?.[1];
+      lines.push(id.padEnd(12) + " luft=" + (air||"—") + " vei=" + (road||"—"));
+    }
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    res.send(xml.slice(0, 5000));
+    res.send("Station IDs (" + lines.length + "):\n\n" + lines.join("\n"));
   } catch(e) {
     res.status(502).send("Feil: " + e.message);
   }
