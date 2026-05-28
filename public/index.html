@@ -605,17 +605,12 @@ function loadGoogleMap(key) {
   document.head.appendChild(sc);
 }
 
-// Init map on load if key exists
 // Pre-fetch GM key from server so it's ready when modal opens
 fetch("/api/gmkey").then(r => r.json()).then(d => {
   if (d.key) window.GM_SERVER_KEY = d.key;
 }).catch(() => {});
-if (savedKey) {
-  loadGoogleMap(savedKey);
-} else {
-  el("gmap").style.display = "none";
-  el("map-nokey").style.display = "flex";
-}
+el("map-nokey").style.display = "flex"; // shown until key loads and modal opens
+
 
 // ─── ENTUR DEPARTURES ─────────────────────────────────────────────────────────
 let cachedStopId = null;
