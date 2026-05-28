@@ -100,6 +100,32 @@ app.get("/debug/allroutes", async (req, res) => {
   }
 });
 
+// ─── Debug: all still cameras with IDs ───────────────────────────────────────
+app.get("/debug/stillcams", async (req, res) => {
+  try {
+    const xml     = await datexGet("GetCCTVSiteTable");
+    const lines   = [];
+    const records = [...xml.matchAll(/<cctvCameraMetadataRecord[^>]*>([\s\S]*?)<\/cctvCameraMetadataRecord>/gi)];
+    for (const m of records) {
+      const block = m[1];
+      const lat   = parseFloat(block.match(/<latitude>([^<]+)<\/latitude>/i)?.[1] || "0");
+      const lon   = parseFloat(block.match(/<longitude>([^<]+)<\/longitude>/i)?.[1] || "0");
+      if (!(lat > 59.5 && lat < 60.3 && lon > 10.1 && lon < 11.2)) continue;
+      const id      = m[0].match(/id="([^"]+)"/)?.[1] || "?";
+      const descB   = block.match(/<cctvCameraSiteLocalDescription[^>]*>([\s\S]*?)<\/cctvCameraSiteLocalDescription>/i)?.[1] || "";
+      const name    = descB.match(/<value[^>]*>([^<]+)<\/value>/i)?.[1]?.trim() || id;
+      const videoB  = block.match(/<cctvVideoService[^>]*>([\s\S]*?)<\/cctvVideoService>/i)?.[1] || "";
+      const videoUrl= videoB.match(/<urlLinkAddress>([^<]+)<\/urlLinkAddress>/i)?.[1]?.trim() || "";
+      const hasVideo= videoUrl && videoUrl.length > 5;
+      if (!hasVideo) lines.push(id.padEnd(14) + " " + name);
+    }
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.send("Still cameras in Oslo area:\n\n" + lines.join("\n"));
+  } catch(e) {
+    res.status(502).send("Feil: " + e.message);
+  }
+});
+
 // ─── Debug: which Oslo cameras have video streams ────────────────────────────
 app.get("/debug/cameravideo", async (req, res) => {
   try {

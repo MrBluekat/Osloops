@@ -892,6 +892,7 @@ const hlsInstances = [];
 
 // Custom display names — keyed by camera ID in the URL
 const CAM_NAMES = {
+  // Live video cameras
   "3001091_1": "Bjørum (E16 Retning Sandvika)",
   "0229018_1": "Djupdalen (Retning Skedsmo)",
   "0329007_1": "Fiskevollbukta (E18 Retning Oslo)",
@@ -900,20 +901,36 @@ const CAM_NAMES = {
   "0229009_1": "Sandvika øst (E18 Retning Drammen)",
   "3001092_1": "Skaret (E16 Retning Sandvika)",
   "0329034_1": "Ullevål (Ring 3 Retning Sinsen)",
+  // Still image cameras — matched by ID
+  "0229005_1": "Gjelleråsen (RV4 Retning Oslo)",
+  "0329004_1": "Furuset (E6 Retning Lørenskog)",
+  "0329002_1": "Hjortnes (E18 Retning Sentrum)",
+  "0629001_2": "Lierskogen (E18 Retning Drammen)",
+  "0329003_1": "Linderud (RV4 Retning Gjelleråsen)",
+  "3000084_1": "Nøstvett (E6 Retning Oslo)",
+  "0229006_1": "Skui (E16 Retning Sollihøgda)",
+  "0629017_1": "Sollihøgda (E16 Retning Hønefoss)",
+  "3000417_1": "Taraldrud (E6 Retning Oslo)",
 };
 
 // Also match by partial DATEX name for cameras like Gardermoen and Sonsveien
 const CAM_NAMES_PARTIAL = {
-  "gardermoen": "Gardermoen (E16 Retning Gardermoen)",
-  "sonsveien":  "Sonsveien (E6 Retning Moss)",
-  "bjørum":     "Bjørum (E16 Retning Sandvika)",
-  "djupdalen":  "Djupdalen (Retning Skedsmo)",
-  "skaret":     "Skaret (E16 Retning Sandvika)",
-  "lierskogen": "Lierskogen (E18 Retning Oslo)",
+  // Live cameras
+  "gardermoen":     "Gardermoen (E16 Retning Gardermoen)",
+  "sonsveien":      "Sonsveien (E6 Retning Moss)",
+  "bjørum":         "Bjørum (E16 Retning Sandvika)",
+  "djupdalen":      "Djupdalen (Retning Skedsmo)",
+  "skaret":         "Skaret (E16 Retning Sandvika)",
   "fiskevollbukta": "Fiskevollbukta (E18 Retning Oslo)",
   "sandstuveien":   "Sandstuveien (E6 Retning Abildsø)",
   "ullevål":        "Ullevål (Ring 3 Retning Sinsen)",
   "sandvika":       "Sandvika øst (E18 Retning Drammen)",
+  // Still cameras — partial name match for those without confirmed IDs
+  "romeriksåsen":       "Romeriksåsen (E16 Retning Gardermoen)",
+  "hallingby":          "Hallingby (E16 Retning Fagernes)",
+  "grelland":           "Grelland (E18 Retning Larvik)",
+  "smaalenenes":        "Smaalenenes bru (E18 Retning Elvestad)",
+  "vestby":             "Vestby (E6 Retning Moss)",
 };
 
 function getCamName(cam) {
