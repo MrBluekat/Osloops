@@ -311,6 +311,18 @@
     #grid{grid-template-columns:1fr}
     #grid{flex-direction:column}
     #right-col{width:100%}
+    /* Compact header on mobile */
+    #header{flex-wrap:wrap;padding:6px 10px;gap:4px}
+    .logo{font-size:12px;letter-spacing:2px}
+    .meta-row{gap:8px;flex-wrap:wrap}
+    .meta-item{font-size:7px}
+    .meta-val{font-size:9px}
+    /* Hide coordinates on mobile */
+    .meta-item:nth-child(2){display:none}
+    /* Smaller buttons */
+    #header button{font-size:7px !important;padding:3px 6px !important;letter-spacing:1px !important}
+    /* Fullscreen not useful on mobile */
+    #header button[onclick="toggleFullscreen()"]{display:none}
   }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.7/hls.min.js"></script>
@@ -471,15 +483,6 @@
       </div>
       <div id="dep-body"><div class="loading"><div class="spinner"></div>FETCHING…</div></div>
     </div>
-    <!-- ROAD CONDITIONS -->
-    <div class="panel" id="road-panel">
-      <div class="panel-glow"></div>
-      <div class="panel-head">
-        <span class="panel-title">🛣 ROAD CONDITIONS — OSLO</span>
-        <span class="badge badge-blue">DATEX II</span>
-      </div>
-      <div id="road-body"><div class="loading"><div class="spinner"></div>LOADING…</div></div>
-    </div>
     <div class="panel" id="travel-panel">
       <div class="panel-glow"></div>
       <div class="panel-head">
@@ -497,6 +500,15 @@
         </div>
         <div id="weather-body"><div class="loading"><div class="spinner"></div>LOADING…</div></div>
       </div>
+    <!-- ROAD CONDITIONS -->
+    <div class="panel" id="road-panel">
+      <div class="panel-glow"></div>
+      <div class="panel-head">
+        <span class="panel-title">🛣 ROAD CONDITIONS — OSLO</span>
+        <span class="badge badge-blue">DATEX II</span>
+      </div>
+      <div id="road-body"><div class="loading"><div class="spinner"></div>LOADING…</div></div>
+    </div>
       <div class="panel">
         <div class="panel-glow"></div>
         <div class="panel-head">
