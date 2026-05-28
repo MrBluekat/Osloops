@@ -63,7 +63,7 @@ app.use(express.urlencoded({ extended: false }));
 app.post("/login", (req, res) => {
   const token = createHash("sha256").update(SITE_PASSWORD).digest("hex");
   if (req.body.password === SITE_PASSWORD) {
-    res.setHeader("Set-Cookie", "auth=" + encodeURIComponent(token) + "; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000");
+    res.setHeader("Set-Cookie", "auth=" + encodeURIComponent(token) + "; Path=/; HttpOnly; SameSite=Strict");
     res.redirect("/");
   } else {
     res.redirect("/?err=1");
