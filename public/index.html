@@ -944,12 +944,15 @@ const CAM_NAMES_PARTIAL = {
 function getCamName(cam) {
   // Try ID match first (most reliable)
   if (cam.videoUrl || cam.imgUrl) {
-    const url = cam.videoUrl || cam.imgUrl || "";
-    const idMatch = url.match(/\/([^/]+)\/manifest\.m3u8|\/images\/([^/?]+)/);
-    const id = idMatch ? (idMatch[1] || idMatch[2]) : null;
+    // Decode URL-encoded imgUrl (e.g. %2Fimages%2F0229005_1 → /images/0229005_1)
+    const rawUrl = cam.videoUrl || cam.imgUrl || "";
+    const url    = decodeURIComponent(rawUrl);
+    const idMatch = url.match(/\/([^/]+)\/manifest\.m3u8/) ||
+                    url.match(/\/images\/([^/?&\s]+)/);
+    const id = idMatch ? idMatch[1] : null;
     if (id && CAM_NAMES[id]) return CAM_NAMES[id];
   }
-  // Fall back to partial name match
+  // Fall back to partial name match on DATEX name
   const lower = (cam.name || "").toLowerCase();
   for (const [key, val] of Object.entries(CAM_NAMES_PARTIAL)) {
     if (lower.includes(key)) return val;
