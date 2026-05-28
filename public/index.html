@@ -487,9 +487,20 @@ let gmapInstance = null;
 
 function openMapModal() {
   el("map-modal").classList.add("open");
-  // Use injected server key, or localStorage fallback
   const key = window.GM_SERVER_KEY || localStorage.getItem("gm_key");
-  if (key && !gmapInstance) loadGoogleMap(key);
+  if (!key) {
+    el("map-nokey").style.display = "flex";
+    return;
+  }
+  el("map-nokey").style.display = "none";
+  // Always reload map when opening — ensures correct dimensions
+  if (!gmapInstance) {
+    loadGoogleMap(key);
+  } else {
+    // Trigger resize in case modal was closed/reopened
+    google.maps.event.trigger(gmapInstance, "resize");
+    gmapInstance.setCenter({lat: 59.9139, lng: 10.7522});
+  }
 }
 function closeMapModal() {
   el("map-modal").classList.remove("open");
