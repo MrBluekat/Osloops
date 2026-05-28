@@ -488,19 +488,26 @@ let gmapInstance = null;
 function openMapModal() {
   el("map-modal").classList.add("open");
   const key = window.GM_SERVER_KEY || localStorage.getItem("gm_key");
-  if (!key) {
-    el("map-nokey").style.display = "flex";
+  if (key) {
+    el("map-nokey").style.display = "none";
+    if (!gmapInstance) {
+      loadGoogleMap(key);
+    } else {
+      google.maps.event.trigger(gmapInstance, "resize");
+      gmapInstance.setCenter({lat: 59.9139, lng: 10.7522});
+    }
     return;
   }
-  el("map-nokey").style.display = "none";
-  // Always reload map when opening — ensures correct dimensions
-  if (!gmapInstance) {
-    loadGoogleMap(key);
-  } else {
-    // Trigger resize in case modal was closed/reopened
-    google.maps.event.trigger(gmapInstance, "resize");
-    gmapInstance.setCenter({lat: 59.9139, lng: 10.7522});
-  }
+  // Key not cached yet — fetch from server
+  fetch("/api/gmkey").then(r => r.json()).then(d => {
+    if (d.key) {
+      window.GM_SERVER_KEY = d.key;
+      el("map-nokey").style.display = "none";
+      if (!gmapInstance) loadGoogleMap(d.key);
+    } else {
+      el("map-nokey").style.display = "flex";
+    }
+  }).catch(() => { el("map-nokey").style.display = "flex"; });
 }
 function closeMapModal() {
   el("map-modal").classList.remove("open");
@@ -599,7 +606,10 @@ function loadGoogleMap(key) {
 }
 
 // Init map on load if key exists
-const savedKey = window.GM_SERVER_KEY || localStorage.getItem("gm_key");
+// Pre-fetch GM key from server so it's ready when modal opens
+fetch("/api/gmkey").then(r => r.json()).then(d => {
+  if (d.key) window.GM_SERVER_KEY = d.key;
+}).catch(() => {});
 if (savedKey) {
   loadGoogleMap(savedKey);
 } else {
