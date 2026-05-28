@@ -181,6 +181,17 @@ app.get("/debug/env", (_req, res) => {
   });
 });
 
+// ─── Debug: road weather raw XML ─────────────────────────────────────────────
+app.get("/debug/roadweather", async (req, res) => {
+  try {
+    const xml = await datexGet("GetMeasuredWeatherData");
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.send(xml.slice(0, 5000));
+  } catch(e) {
+    res.status(502).send("Feil: " + e.message);
+  }
+});
+
 // ─── Debug — visit /debug/cameras, /debug/travel, /debug/incidents, /debug/locations
 app.get("/debug/:name", async (req, res) => {
   const map = {
@@ -761,17 +772,6 @@ app.get("/roadweather", async (req, res) => {
   } catch (e) {
     console.error("Road weather error:", e.message);
     res.status(502).json({ ok: false, error: e.message, stations: [] });
-  }
-});
-
-// ─── Debug: road weather raw XML ─────────────────────────────────────────────
-app.get("/debug/roadweather", async (req, res) => {
-  try {
-    const xml = await datexGet("GetMeasuredWeatherData");
-    res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    res.send(xml.slice(0, 5000));
-  } catch(e) {
-    res.status(502).send("Feil: " + e.message);
   }
 });
 
