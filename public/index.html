@@ -405,8 +405,18 @@
       <div id="amb-body"><div class="loading"><div class="spinner"></div>SØKER…</div></div>
     </div>
 
-    <!-- VEGVESEN HENDELSER — injected last by JS -->
-    <div id="incidents-wrapper"></div>
+    <!-- VEGVESEN INCIDENT REPORTS — panel pre-rendered, content filled by JS -->
+    <div class="panel" id="incidents-panel">
+      <div class="panel-glow"></div>
+      <div class="panel-head">
+        <span class="panel-title">🚧 VEGVESEN INCIDENT REPORTS</span>
+        <span class="badge badge-orange">DATEX II</span>
+      </div>
+      <div class="pol-grid" id="incidents-body">
+        <div class="loading"><div class="spinner"></div>FETCHING DATEX II…</div>
+      </div>
+      <div class="pol-src">Kilde: Statens vegvesen DATEX II · NLOD</div>
+    </div>
   </div>
 
   <!-- RIGHT COLUMN: departures → travel → weather → AQ (stacked, no gaps) -->
@@ -1036,7 +1046,10 @@ async function loadIncidents() {
     const res  = await fetch("/incidents");
     const data = await res.json();
 
-    if (!data.ok || !data.incidents?.length) return; // ingen hendelser — vis ikke panelet
+    if (!data.ok || !data.incidents?.length) {
+      if (el("incidents-body")) el("incidents-body").innerHTML = '<div class="loading" style="color:var(--g3)">Ingen aktive hendelser</div>';
+      return;
+    }
 
     const items = data.incidents.map(item => {
       const dt = item.time ? new Date(item.time).toLocaleString("no-NO",
@@ -1052,23 +1065,12 @@ async function loadIncidents() {
       </div>`;
     }).join("");
 
-    // Lag panelet første gang, oppdater deretter
-    if (!el("incidents-panel")) {
-      const panel = document.createElement("div");
-      panel.id = "incidents-panel";
-      panel.className = "panel";
-      panel.style.cssText = "";
-      panel.innerHTML = `<div class="panel-glow"></div>
-        <div class="panel-head">
-          <span class="panel-title">🚧 VEGVESEN INCIDENT REPORTS</span>
-          <span class="badge badge-orange">DATEX II</span>
-        </div>
-        <div class="pol-grid" id="incidents-body"></div>
-        <div class="pol-src">Kilde: Statens vegvesen DATEX II · NLOD</div>`;
-      const w = el("incidents-wrapper"); if(w){w.appendChild(panel);}else{el("police-panel").insertAdjacentElement("afterend",panel);}
-    }
-    el("incidents-body").innerHTML = items;
+    // Panel is already in DOM — just update content
+    el("incidents-body").innerHTML = items || '<div class="loading" style="color:var(--g3)">Ingen aktive hendelser</div>';
   } catch(e) {
+    if (el("incidents-body")) {
+      el("incidents-body").innerHTML = '<div class="loading err-text">⚠ ' + e.message + '</div>';
+    }
     console.warn("Incidents feil:", e.message);
   }
 }
