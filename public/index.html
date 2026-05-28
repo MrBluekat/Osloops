@@ -1312,6 +1312,28 @@ function toggleFullscreen() {
 }
 
 // ─── ROAD CONDITIONS ──────────────────────────────────────────────────────────
+// Station ID → location name mapping for known Oslo-area stations
+const ROAD_STATION_NAMES = {
+  "1629006": "Lierskogen",
+  "729002":  "Grelland",
+  "229005":  "Gjelleråsen",
+  "329004":  "Furuset",
+  "329002":  "Hjortnes",
+  "229006":  "Skui",
+  "629017":  "Sollihøgda",
+  "329031":  "Sandstuveien",
+  "229009":  "Sandvika",
+  "329007":  "Fiskevollbukta",
+  "629001":  "Lierskogen",
+  "329034":  "Ullevål",
+  "329003":  "Linderud",
+  "229013":  "Vestby",
+  "84001":   "Nøstvett",
+};
+function stationName(id) {
+  return ROAD_STATION_NAMES[id] || ROAD_STATION_NAMES[id.replace(/^0+/, "")] || "Stasjon " + id;
+}
+
 const ROAD_COND_LABELS = {
   dry: "Tørr", wet: "Våt", icy: "Is", snowy: "Snø",
   frosty: "Frost", slippery: "Glatt", black_ice: "Svart is",
@@ -1332,42 +1354,37 @@ async function loadRoadWeather() {
     if (!data.ok || !data.stations?.length) throw new Error(data.error || "Ingen data");
 
     const rows = data.stations.map(s => {
-      const air   = s.airTemp  ? parseFloat(s.airTemp).toFixed(1)  : null;
-      const road  = s.roadTemp ? parseFloat(s.roadTemp).toFixed(1) : null;
-      const wind  = s.wind     ? parseFloat(s.wind).toFixed(1)     : null;
-      const rain  = s.precip   ? parseFloat(s.precip).toFixed(1)   : null;
+      const name  = stationName(s.ref);
+      const air   = s.airTemp  ? parseFloat(s.airTemp).toFixed(1)  : "—";
+      const road  = s.roadTemp ? parseFloat(s.roadTemp).toFixed(1) : "—";
+      const wind  = s.wind     ? parseFloat(s.wind).toFixed(1)     : "—";
+      const rain  = s.precip   ? parseFloat(s.precip).toFixed(1)   : "0.0";
       const cond  = roadCondLabel(s.roadCond);
 
-      // Color road temp: below 0 = orange warning, below -5 = red
-      const roadColor = road === null ? "var(--g3)"
+      const roadColor = s.roadTemp === undefined ? "var(--g3)"
         : parseFloat(road) < -5 ? "#ff3838"
         : parseFloat(road) < 0  ? "#ff9500"
         : "var(--g)";
 
-      // Road condition icon
-      const condIcon = !s.roadCond ? "" 
-        : s.roadCond.toLowerCase().includes("dry")   ? "🟢"
-        : s.roadCond.toLowerCase().includes("wet")   ? "🔵"
-        : s.roadCond.toLowerCase().includes("snow")  ? "⚪"
-        : s.roadCond.toLowerCase().includes("ic")    ? "🔴"
-        : s.roadCond.toLowerCase().includes("frost") ? "🟠"
-        : "⚫";
+      const condBadge = !cond ? "" :
+        `<span style="background:rgba(0,255,65,.1);border:1px solid var(--g3);
+        color:var(--g);font-size:8px;padding:1px 5px;border-radius:1px;margin-left:4px">${cond}</span>`;
 
-      return `<div style="display:flex;justify-content:space-between;align-items:center;
-        padding:7px 12px;border-bottom:1px solid rgba(0,100,30,.3)">
-        <div style="font-size:9px;color:var(--g3);min-width:60px">ID ${s.ref}</div>
-        <div style="display:flex;gap:12px;align-items:center;flex:1;justify-content:center">
-          ${air  !== null ? `<span title="Lufttemperatur" style="font-size:11px">🌡 <span style="color:var(--g)">${air}°C</span></span>` : ""}
-          ${road !== null ? `<span title="Veibanetemperatur" style="font-size:11px">🛣 <span style="color:${roadColor}">${road}°C</span></span>` : ""}
-          ${wind !== null ? `<span title="Vindhastighet" style="font-size:11px">💨 <span style="color:var(--g)">${wind} m/s</span></span>` : ""}
-          ${rain !== null ? `<span title="Nedbør" style="font-size:11px">🌧 <span style="color:var(--g)">${rain} mm/t</span></span>` : ""}
-          ${cond ? `<span style="font-size:10px">${condIcon} <span style="color:var(--g)">${cond}</span></span>` : ""}
+      return `<div style="padding:8px 12px;border-bottom:1px solid rgba(0,100,30,.3)">
+        <div style="font-size:11px;color:var(--g);margin-bottom:5px;font-weight:bold">
+          ${name}${condBadge}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;font-size:10px">
+          <div style="color:var(--g3)">🌡 Luft<br><span style="color:var(--g);font-size:12px">${air}°C</span></div>
+          <div style="color:var(--g3)">🛣 Vei<br><span style="color:${roadColor};font-size:12px">${road}°C</span></div>
+          <div style="color:var(--g3)">💨 Vind<br><span style="color:var(--g);font-size:12px">${wind} m/s</span></div>
+          <div style="color:var(--g3)">🌧 Nedbør<br><span style="color:var(--g);font-size:12px">${rain} mm/t</span></div>
         </div>
       </div>`;
     }).join("");
 
     el("road-body").innerHTML = rows +
-      '<div class="pol-src">🌡 Luft · 🛣 Veibane · 💨 Vind · Kilde: Vegvesen DATEX II</div>';
+      '<div class="pol-src">Kilde: Statens vegvesen DATEX II · NLOD</div>';
   } catch(e) {
     el("road-body").innerHTML = '<div class="loading err-text">⚠ ' + e.message + '</div>';
   }
