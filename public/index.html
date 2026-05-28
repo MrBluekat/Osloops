@@ -8,15 +8,37 @@
 <style>
   /* ── MATRIX THEME ── bright green on black ── */
   :root{
-    --g:    #00ff41;   /* main matrix green */
-    --g2:   #00c832;   /* slightly dimmer green */
-    --g3:   #007a20;   /* dim green for borders */
-    --g4:   #003d10;   /* very dark green for panel bg */
-    --g5:   #001a08;   /* near-black green background */
+    --g:    #00ff41;
+    --g2:   #00c832;
+    --g3:   #007a20;
+    --g4:   #003d10;
+    --g5:   #001a08;
     --glow: 0 0 10px rgba(0,255,65,.5);
     --red:  #ff3838;
     --yel:  #ffe000;
+    --bg:   #000;
+    --text: #00ff41;
   }
+  body.day-theme{
+    --g:    #1a6e1a;
+    --g2:   #2d8c2d;
+    --g3:   #5aab5a;
+    --g4:   #e8f5e8;
+    --g5:   #f0faf0;
+    --glow: none;
+    --red:  #cc0000;
+    --yel:  #cc8800;
+    --bg:   #f0faf0;
+    --text: #1a3a1a;
+  }
+  body.day-theme{ background:#f0faf0;color:#1a3a1a }
+  body.day-theme #header{ background:rgba(240,250,240,.97);border-bottom:1px solid var(--g3) }
+  body.day-theme .panel{ background:#fff;border-color:var(--g3) }
+  body.day-theme .panel-head{ background:#e8f5e8 }
+  body.day-theme .dep-row:hover{ background:rgba(0,100,0,.05) }
+  body.day-theme .cam-card{ background:#fff }
+  body.day-theme .cam-card-live{ background:#fff }
+  body.day-theme::after{ display:none }
   *{box-sizing:border-box;margin:0;padding:0}
   body{
     background:#000;
@@ -302,6 +324,16 @@
       ▣ TRAFFIC MAP
     </button>
   </div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <button onclick="toggleTheme()" id="theme-btn" title="Bytt tema"
+      style="background:rgba(0,255,65,.08);border:1px solid var(--g3);color:var(--g);
+      font-family:'Share Tech Mono',monospace;font-size:11px;padding:4px 10px;
+      cursor:pointer;border-radius:1px;letter-spacing:1px;transition:all .15s">☀</button>
+    <button onclick="toggleFullscreen()" title="Fullskjerm"
+      style="background:rgba(0,255,65,.08);border:1px solid var(--g3);color:var(--g);
+      font-family:'Share Tech Mono',monospace;font-size:11px;padding:4px 10px;
+      cursor:pointer;border-radius:1px;letter-spacing:1px;transition:all .15s">⛶</button>
+  </div>
   <div class="meta-row">
     <div class="meta-item"><strong class="meta-val" id="clock">--:--:--</strong>LOCAL TIME</div>
     <div class="meta-item"><strong class="meta-val">OSLO, NO</strong>59.94°N 10.67°E</div>
@@ -431,6 +463,15 @@
         </div>
       </div>
       <div id="dep-body"><div class="loading"><div class="spinner"></div>FETCHING…</div></div>
+    </div>
+    <!-- ROAD CONDITIONS -->
+    <div class="panel" id="road-panel">
+      <div class="panel-glow"></div>
+      <div class="panel-head">
+        <span class="panel-title">🛣 ROAD CONDITIONS — OSLO</span>
+        <span class="badge badge-blue">DATEX II</span>
+      </div>
+      <div id="road-body"><div class="loading"><div class="spinner"></div>LOADING…</div></div>
     </div>
     <div class="panel" id="travel-panel">
       <div class="panel-glow"></div>
@@ -1216,9 +1257,68 @@ async function loadAmbassade() {
   }
 }
 
+// ─── THEME TOGGLE ─────────────────────────────────────────────────────────────
+function toggleTheme() {
+  const isDay = document.body.classList.toggle("day-theme");
+  el("theme-btn").textContent = isDay ? "🌙" : "☀";
+  localStorage.setItem("theme", isDay ? "day" : "night");
+}
+// Restore saved theme
+if (localStorage.getItem("theme") === "day") {
+  document.body.classList.add("day-theme");
+  document.addEventListener("DOMContentLoaded", () => { el("theme-btn").textContent = "🌙"; });
+}
+
+// ─── FULLSCREEN ───────────────────────────────────────────────────────────────
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(() => {});
+  } else {
+    document.exitFullscreen().catch(() => {});
+  }
+}
+
+// ─── ROAD CONDITIONS ──────────────────────────────────────────────────────────
+const ROAD_COND_LABELS = {
+  dry: "Tørr", wet: "Våt", icy: "Is", snowy: "Snø",
+  frosty: "Frost", slippery: "Glatt", black_ice: "Svart is",
+  frost: "Frost", damp: "Fuktig", moist: "Fuktig",
+  other: "Ukjent", unknown: "Ukjent",
+};
+function roadCondLabel(v) {
+  if (!v) return "";
+  const key = v.toLowerCase().replace(/[^a-z_]/g, "");
+  return ROAD_COND_LABELS[key] || v;
+}
+
+async function loadRoadWeather() {
+  el("road-body").innerHTML = '<div class="loading"><div class="spinner"></div>HENTER DATEX…</div>';
+  try {
+    const res  = await fetch("/roadweather");
+    const data = await res.json();
+    if (!data.ok || !data.stations?.length) throw new Error(data.error || "Ingen data");
+
+    el("road-body").innerHTML = '<div class="aq-grid">' +
+      data.stations.slice(0, 6).map(s => {
+        const cond  = roadCondLabel(s.roadCond);
+        const color = (s.roadCond||"").toLowerCase().includes("icy") || (s.roadCond||"").toLowerCase().includes("frost") || (s.roadCond||"").toLowerCase().includes("snowy")
+          ? "#ff9500" : "var(--g)";
+        return '<div class="aq-cell">' +
+          '<div class="aq-val" style="color:' + color + ';font-size:11px">' + (cond || "—") + '</div>' +
+          '<div class="aq-name">' + (s.roadTemp ? parseFloat(s.roadTemp).toFixed(1) + "°C vei" : (s.airTemp ? parseFloat(s.airTemp).toFixed(1) + "°C luft" : "")) + '</div>' +
+          '<div class="aq-lbl" style="color:var(--g3);font-size:8px">' + s.ref + '</div>' +
+          '</div>';
+      }).join("") +
+    '</div><div class="aq-src">Kilde: Statens vegvesen DATEX II</div>';
+  } catch(e) {
+    el("road-body").innerHTML = '<div class="loading err-text">⚠ ' + e.message + '</div>';
+  }
+}
+
 loadDepartures();
 loadWeather();
 loadAirQuality();
+loadRoadWeather();
 loadPolice();
 fetchNews('vg'); fetchNews('db'); fetchNews('tv2'); fetchNews('na'); fetchNews('ap');
 loadAmbassade();
@@ -1230,6 +1330,7 @@ loadIncidents();
 setInterval(loadDepartures,   60000);
 setInterval(loadWeather,     300000);
 setInterval(loadAirQuality,  600000);
+setInterval(loadRoadWeather, 300000);
 setInterval(loadPolice,      180000);
 setInterval(() => { Object.keys(newsCache).forEach(t => { newsCache[t]=null; }); fetchNews(activeTab); }, 300000);
 setInterval(loadAmbassade,   300000);

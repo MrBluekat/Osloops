@@ -719,6 +719,51 @@ app.get("/api/gmkey", (_req, res) => {
   res.json({ key });
 });
 
+// ─── Road conditions (DATEX GetMeasuredWeatherData) ──────────────────────────
+app.get("/roadweather", async (req, res) => {
+  try {
+    const xml = await datexGet("GetMeasuredWeatherData");
+
+    const results = [];
+    const records = [...xml.matchAll(/<siteMeasurements[^>]*>([\s\S]*?)<\/siteMeasurements>/gi)];
+
+    for (const rec of records) {
+      const block = rec[1];
+
+      // Location name
+      const refM = block.match(/measurementSiteReference[^>]+refId="([^"]+)"/i);
+      const ref  = refM ? refM[1] : "";
+
+      // Only Oslo area stations — filter by ID prefix or just grab all and filter by name
+      const airTemp    = block.match(/<airTemperature[^>]*>\s*<temperature[^>]*>([^<]+)<\/temperature>/i)?.[1];
+      const roadTemp   = block.match(/<roadSurfaceTemperature[^>]*>\s*<temperature[^>]*>([^<]+)<\/temperature>/i)?.[1] ||
+                         block.match(/<roadTemperature[^>]*>\s*<temperature[^>]*>([^<]+)<\/temperature>/i)?.[1];
+      const precip     = block.match(/<precipitationIntensity[^>]*>([^<]+)<\/precipitationIntensity>/i)?.[1];
+      const snowDepth  = block.match(/<snowDepth[^>]*>([^<]+)<\/snowDepth>/i)?.[1];
+      const friction   = block.match(/<friction[^>]*>([^<]+)<\/friction>/i)?.[1];
+      const roadCond   = block.match(/<roadSurfaceConditionMeasurements[^>]*>\s*<weatherRelatedRoadConditionType[^>]*>([^<]+)<\/weatherRelatedRoadConditionType>/i)?.[1] ||
+                         block.match(/<weatherRelatedRoadConditionType[^>]*>([^<]+)<\/weatherRelatedRoadConditionType>/i)?.[1];
+      const wind       = block.match(/<windSpeed[^>]*>([^<]+)<\/windSpeed>/i)?.[1];
+
+      if (ref && (airTemp || roadTemp || roadCond)) {
+        results.push({ ref, airTemp, roadTemp, precip, snowDepth, friction, roadCond, wind });
+      }
+    }
+
+    // Log first record structure for debugging
+    if (records.length > 0 && results.length === 0) {
+      console.log("Road weather: no data parsed. Sample block:", records[0][1].slice(0, 500));
+    }
+
+    console.log("Road weather: " + results.length + " stasjoner av " + records.length + " records");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.json({ ok: true, count: results.length, stations: results.slice(0, 10) });
+  } catch (e) {
+    console.error("Road weather error:", e.message);
+    res.status(502).json({ ok: false, error: e.message, stations: [] });
+  }
+});
+
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
