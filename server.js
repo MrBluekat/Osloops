@@ -581,6 +581,54 @@ app.use(["/api", "/travel", "/incidents", "/cameras", "/camerasfull", "/roadweat
   next();
 });
 
+// ─── Politiloggen — offisielt RSS API (oppdatert 11. mai 2026) ───────────────
+app.get("/api/politiloggen", async (req, res) => {
+  try {
+    // New RSS URL format from politiet.no/rss (updated May 11, 2026)
+    // The URL is generated dynamically — try all known variants
+    const rssUrls = [
+      "https://api.politiet.no/politiloggen/v1/rss?districts=oslo&pageSize=10",
+      "https://api.politiet.no/politiloggen/v1/rss?districts=Oslo&pageSize=10",
+      "https://api.politiet.no/politiloggen/v1/rss?district=oslo",
+      "https://api.politiet.no/politiloggen/v1/rss?distrikt=oslo",
+      "https://api.politiet.no/politiloggen/v1/rss?distrikt=Oslo",
+      "https://api.politiet.no/politiloggen/v2/rss?districts=oslo",
+      "https://api.politiloggen.politiet.no/v1/rss?districts=oslo",
+      "https://api.politiloggen.politiet.no/v2/rss?districts=oslo",
+    ];
+
+    for (const rssUrl of rssUrls) {
+      try {
+        const r = await fetch(rssUrl, {
+          headers: {
+            "User-Agent": "oslo-ops-center/1.0",
+            "Accept": "application/rss+xml, application/xml, text/xml",
+          },
+          signal: AbortSignal.timeout(5000),
+        });
+        if (!r.ok) { console.log("Politiloggen " + r.status + ": " + rssUrl); continue; }
+        const xml   = await r.text();
+        const items = parseRssItems(xml, 10).map(m => ({
+          ...m,
+          category: (m.title || "").match(/^([^:,]{3,30}):/)?.[1]?.trim() || "",
+          url:      m.url || "https://www.politiet.no/politiloggen?distrikt=oslo",
+        }));
+        if (items.length) {
+          console.log("Politiloggen OK (" + items.length + " meldinger): " + rssUrl);
+          res.setHeader("Access-Control-Allow-Origin", "*");
+          return res.json({ ok: true, items });
+        }
+        console.log("Politiloggen 0 items: " + rssUrl);
+      } catch(e) { console.log("Politiloggen feil " + rssUrl + ": " + e.message); }
+    }
+
+    throw new Error("Alle RSS-URLer feilet — sjekk politiet.no/rss for ny URL");
+  } catch (e) {
+    console.error("Politiloggen error:", e.message);
+    res.status(502).json({ ok: false, error: e.message, items: [] });
+  }
+});
+
 // ─── Politiloggen — offisielt RSS API ────────────────────────────────────────
 app.get("/api/politiloggen", async (req, res) => {
   try {
