@@ -623,20 +623,36 @@ app.get("/api/politiloggen", async (req, res) => {
       }
     }
 
-    // Fallback: parse rendered HTML — extract article/section headings
+    // Fallback: try multiple HTML patterns for politiet.no
     const items = [];
-    // Match pattern: "Tema: Sted time Description"
-    const articlePattern = /<article[^>]*>([\s\S]*?)<\/article>/gi;
-    const articles = [...html.matchAll(articlePattern)].slice(0, 10);
-    for (const a of articles) {
-      const text = a[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-      const titleM = a[1].match(/<h[123][^>]*>([^<]+)<\/h[123]>/i);
-      const title = titleM ? titleM[1].trim() : text.slice(0, 100);
-      const timeM = text.match(/(\d{1,2}:\d{2})/);
-      const catM  = title.match(/^([^:,]+):/);
-      if (title.length > 5) {
-        items.push({ title, date: timeM ? timeM[1] : "", category: catM ? catM[1].trim() : "", url: "https://www.politiet.no/politiloggen?distrikt=oslo" });
+
+    // Try __NEXT_DATA__ first (already tried above, try again with different paths)
+    const jsonMatches = [...html.matchAll(/"title"\s*:\s*"([^"]{10,200})"/g)];
+    const timeMatches = [...html.matchAll(/"(20\d{2}-\d{2}-\d{2}T[^"]+)"/g)];
+
+    // Try to find log entries via common patterns in the HTML
+    const patterns = [
+      /<h[1-4][^>]*>([^<]{15,200})<\/h[1-4]>/gi,
+      /<p[^>]*class="[^"]*title[^"]*"[^>]*>([^<]{10,200})<\/p>/gi,
+      /<span[^>]*class="[^"]*title[^"]*"[^>]*>([^<]{10,200})<\/span>/gi,
+      /data-testid="[^"]*title[^"]*"[^>]*>([^<]{10,200})</gi,
+    ];
+
+    for (const pattern of patterns) {
+      const matches = [...html.matchAll(pattern)].slice(0, 10);
+      for (const m of matches) {
+        const title = m[1].replace(/<[^>]+>/g, "").trim();
+        if (title.length > 10 && !title.includes("politiet.no") && !title.includes("cookie")) {
+          const catM = title.match(/^([^:,]{3,30}):/);
+          items.push({
+            title,
+            date: "",
+            category: catM ? catM[1].trim() : "",
+            url: "https://www.politiet.no/politiloggen?distrikt=oslo"
+          });
+        }
       }
+      if (items.length >= 5) break;
     }
 
     if (!items.length) throw new Error("Fant ingen hendelser på siden");
