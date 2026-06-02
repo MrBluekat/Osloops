@@ -574,6 +574,13 @@ app.get("/camerasfull", async (req, res) => {
   }
 });
 
+// ─── No-cache middleware for all /api routes ─────────────────────────────────
+app.use(["/api", "/travel", "/incidents", "/cameras", "/camerasfull", "/roadweather", "/datex", "/rss"], (_req, res, next) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  next();
+});
+
 // ─── Politiloggen — scraper politiet.no/politiloggen direkte ─────────────────
 app.get("/api/politiloggen", async (req, res) => {
   try {
