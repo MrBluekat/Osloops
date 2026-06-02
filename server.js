@@ -581,6 +581,72 @@ app.use(["/api", "/travel", "/incidents", "/cameras", "/camerasfull", "/roadweat
   next();
 });
 
+// ─── Politiloggen — offisielt RSS API ────────────────────────────────────────
+app.get("/api/politiloggen", async (req, res) => {
+  try {
+    // Try official RSS endpoints
+    const rssUrls = [
+      "https://api.politiloggen.politiet.no/v1/rss?districts=oslo",
+      "https://api.politiet.no/politiloggen/v1/rss?districts=oslo",
+      "https://api.politiet.no/politiloggen/v1/rss?districts=Oslo",
+    ];
+
+    for (const rssUrl of rssUrls) {
+      try {
+        const r = await fetch(rssUrl, {
+          headers: { "User-Agent": "oslo-ops-center/1.0", "Accept": "application/rss+xml, text/xml" },
+          signal: AbortSignal.timeout(5000),
+        });
+        if (!r.ok) { console.log("Politiloggen RSS " + rssUrl + " svarte " + r.status); continue; }
+        const xml   = await r.text();
+        const items = parseRssItems(xml, 10).map(m => ({
+          ...m,
+          category: (m.title || "").match(/^([^:,]{3,30}):/)?.[1]?.trim() || "",
+          url:      m.url || "https://www.politiet.no/politiloggen?distrikt=oslo",
+        }));
+        if (items.length) {
+          console.log("Politiloggen RSS OK: " + items.length + " meldinger fra " + rssUrl);
+          res.setHeader("Access-Control-Allow-Origin", "*");
+          return res.json({ ok: true, items });
+        }
+      } catch(e) { console.log("Politiloggen RSS feil " + rssUrl + ": " + e.message); }
+    }
+
+    // Fallback: scrape HTML page
+    const page = await fetch("https://www.politiet.no/politiloggen?distrikt=oslo", {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; oslo-ops-center/1.0)", "Accept": "text/html" }
+    });
+    if (!page.ok) throw new Error("politiet.no svarte " + page.status);
+    const html = await page.text();
+
+    // Try __NEXT_DATA__
+    const ndMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
+    if (ndMatch) {
+      const nd = JSON.parse(ndMatch[1]);
+      const pp = nd?.props?.pageProps;
+      const messages = pp?.messages || pp?.initialMessages ||
+        pp?.dehydratedState?.queries?.[0]?.state?.data?.pages?.[0]?.messages || [];
+      if (messages.length) {
+        const items = messages.slice(0, 10).map(m => ({
+          title:    m.title || m.header || m.message || "(ingen tittel)",
+          date:     m.publishedAt || m.createdAt || m.updatedAt || "",
+          category: m.category || m.tema || "",
+          url:      m.id ? "https://www.politiet.no/politiloggen/hendelse/" + m.id
+                         : "https://www.politiet.no/politiloggen?distrikt=oslo",
+        }));
+        console.log("Politiloggen Next.js: " + items.length + " meldinger");
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        return res.json({ ok: true, items });
+      }
+    }
+
+    throw new Error("Ingen meldinger funnet — politiet.no kan ha endret struktur");
+  } catch (e) {
+    console.error("Politiloggen error:", e.message);
+    res.status(502).json({ ok: false, error: e.message, items: [] });
+  }
+});
+
 // ─── Politiloggen — scraper politiet.no/politiloggen direkte ─────────────────
 app.get("/api/politiloggen", async (req, res) => {
   try {
