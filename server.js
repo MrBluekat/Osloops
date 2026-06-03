@@ -595,7 +595,7 @@ app.get("/api/politiloggen", async (req, res) => {
   }
 
   try {
-    const rssUrl = "https://api.politiet.no/politiloggen/v1/rss?distrikt=Oslo";
+    const rssUrl = "https://api.politiloggen.politiet.no/feeds/rss?districts=Oslo";
     const r = await fetch(rssUrl, {
       headers: { "User-Agent": "oslo-ops-center/1.0 (osloops.xyz)", "Accept": "application/rss+xml, application/xml, text/xml" },
       signal: AbortSignal.timeout(8000),
