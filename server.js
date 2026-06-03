@@ -582,6 +582,62 @@ app.use(["/api", "/travel", "/incidents", "/cameras", "/camerasfull", "/roadweat
 });
 
 // ─── Politiloggen — offisielt RSS API (oppdatert 11. mai 2026) ───────────────
+// Correct URL confirmed: api.politiet.no/politiloggen/v1/rss?distrikt=oslo
+// (returns 429 when rate-limited, which proves the URL is valid)
+let politiCache = { items: [], time: 0 };
+
+app.get("/api/politiloggen", async (req, res) => {
+  // Serve from cache if fetched within last 4 minutes (avoids 429 rate-limiting)
+  const now = Date.now();
+  if (politiCache.items.length && (now - politiCache.time) < 240000) {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    return res.json({ ok: true, items: politiCache.items, cached: true });
+  }
+
+  try {
+    const rssUrl = "https://api.politiet.no/politiloggen/v1/rss?distrikt=oslo";
+    const r = await fetch(rssUrl, {
+      headers: { "User-Agent": "oslo-ops-center/1.0 (osloops.xyz)", "Accept": "application/rss+xml, application/xml, text/xml" },
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (r.status === 429) {
+      // Rate limited — serve stale cache if we have it
+      console.log("Politiloggen 429 (rate limited) — bruker cache");
+      if (politiCache.items.length) {
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        return res.json({ ok: true, items: politiCache.items, cached: true });
+      }
+      throw new Error("Rate limited av politiet.no, prøv igjen senere");
+    }
+
+    if (!r.ok) throw new Error("Politiet API svarte " + r.status);
+
+    const xml   = await r.text();
+    const items = parseRssItems(xml, 10).map(m => ({
+      ...m,
+      category: (m.title || "").match(/^([^:,]{3,30}):/)?.[1]?.trim() || "",
+      url:      m.url || "https://www.politiet.no/politiloggen?distrikt=oslo",
+    }));
+
+    if (!items.length) throw new Error("Ingen meldinger i RSS");
+
+    politiCache = { items, time: now };
+    console.log("Politiloggen OK: " + items.length + " meldinger");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.json({ ok: true, items });
+  } catch (e) {
+    console.error("Politiloggen error:", e.message);
+    // Serve stale cache on error if available
+    if (politiCache.items.length) {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      return res.json({ ok: true, items: politiCache.items, cached: true });
+    }
+    res.status(502).json({ ok: false, error: e.message, items: [] });
+  }
+});
+
+// ─── Politiloggen — offisielt RSS API (oppdatert 11. mai 2026) ───────────────
 app.get("/api/politiloggen", async (req, res) => {
   try {
     // New RSS URL format from politiet.no/rss (updated May 11, 2026)
