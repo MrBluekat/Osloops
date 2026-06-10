@@ -326,6 +326,8 @@
   }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.7/hls.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 </head>
 <body>
 
@@ -420,7 +422,7 @@
           font-size:10px;padding:4px 12px;cursor:pointer;border-radius:1px;letter-spacing:2px">✕ LUKK</button>
       </div>
     </div>
-    <canvas id="lightning-canvas" style="flex:1;width:100%;cursor:crosshair"></canvas>
+    <div id="lightning-map" style="flex:1;width:100%"></div>
   </div>
 
   <!-- FLIGHT MAP MODAL -->
@@ -438,10 +440,7 @@
           cursor:pointer;border-radius:1px;letter-spacing:2px">✕ LUKK</button>
       </div>
     </div>
-    <canvas id="flight-canvas" style="flex:1;width:100%;cursor:crosshair"></canvas>
-    <div id="flight-tooltip" style="display:none;position:fixed;background:rgba(0,0,0,.9);
-      border:1px solid rgba(0,180,255,.4);color:#00b4ff;font-family:'Share Tech Mono',monospace;
-      font-size:10px;padding:6px 10px;pointer-events:none;z-index:1001;line-height:1.6"></div>
+    <div id="flight-map" style="flex:1;width:100%"></div>
   </div>
 
   <!-- LEFT COLUMN: cameras → police → incidents (stacked, no gaps) -->
@@ -1475,390 +1474,162 @@ async function loadRoadWeather() {
   }
 }
 
-// ─── LIGHTNING MAP ────────────────────────────────────────────────────────────
-// Uses Blitzortung WebSocket — open data, non-commercial use
-const LIGHTNING_CENTER = { lat: 59.913, lon: 10.752 }; // Oslo
-const LIGHTNING_RADIUS_KM = 300; // show strikes within 300km
-let lightningWS       = null;
-let lightningStrikes  = []; // { lat, lon, time }
-let lightningCanvas   = null;
-let lightningCtx      = null;
-let lightningAnimFrame = null;
+// ─── LIGHTNING MAP (Leaflet + Blitzortung WebSocket) ─────────────────────────
+let lightningMap     = null;
+let lightningWS      = null;
+let lightningMarkers = L.layerGroup ? L.layerGroup() : null;
+let lightningStrikes = [];
 
 function openLightningModal() {
-  const modal = document.getElementById("lightning-modal");
-  modal.style.display = "flex";
-  lightningCanvas = document.getElementById("lightning-canvas");
-  lightningCtx    = lightningCanvas.getContext("2d");
-  resizeLightningCanvas();
-  connectLightningWS();
-  drawLightning();
+  document.getElementById("lightning-modal").style.display = "flex";
+  setTimeout(() => {
+    if (!lightningMap) {
+      lightningMap = L.map("lightning-map", { zoomControl: true, attributionControl: false })
+        .setView([59.913, 10.752], 6);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 10, className: "dark-tiles"
+      }).addTo(lightningMap);
+      lightningMarkers = L.layerGroup().addTo(lightningMap);
+      // Dark tile overlay style
+      const style = document.createElement("style");
+      style.textContent = ".dark-tiles { filter: invert(1) hue-rotate(180deg) brightness(0.35) saturate(0.5); }";
+      document.head.appendChild(style);
+    }
+    lightningMap.invalidateSize();
+    connectLightningWS();
+  }, 100);
 }
 
 function closeLightningModal() {
   document.getElementById("lightning-modal").style.display = "none";
   if (lightningWS) { lightningWS.close(); lightningWS = null; }
-  if (lightningAnimFrame) { cancelAnimationFrame(lightningAnimFrame); lightningAnimFrame = null; }
-}
-
-function resizeLightningCanvas() {
-  if (!lightningCanvas) return;
-  lightningCanvas.width  = lightningCanvas.offsetWidth;
-  lightningCanvas.height = lightningCanvas.offsetHeight;
-}
-
-// Convert lat/lon to canvas x/y
-function latlonToXY(lat, lon) {
-  const W = lightningCanvas.width, H = lightningCanvas.height;
-  // Equirectangular projection centered on Oslo
-  const scale = Math.min(W, H) / (LIGHTNING_RADIUS_KM * 2) * 111; // 111km per degree
-  const x = W/2 + (lon - LIGHTNING_CENTER.lon) * scale * Math.cos(LIGHTNING_CENTER.lat * Math.PI/180);
-  const y = H/2 - (lat - LIGHTNING_CENTER.lat) * scale;
-  return { x, y };
-}
-
-function haversine(lat1, lon1, lat2, lon2) {
-  const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
-  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-  return R * 2 * Math.asin(Math.sqrt(a));
 }
 
 function connectLightningWS() {
   if (lightningWS) lightningWS.close();
   const status = document.getElementById("lightning-status");
   status.textContent = "CONNECTING…";
-  status.style.color = "rgba(255,224,0,.5)";
-
-  // Blitzortung region 3 = Europe
-  const servers = ["ws1", "ws3", "ws5", "ws7"];
+  const servers = ["ws1","ws3","ws5","ws7"];
   const server  = servers[Math.floor(Math.random() * servers.length)];
   lightningWS = new WebSocket("wss://" + server + ".blitzortung.org/");
-
   lightningWS.onopen = () => {
     status.textContent = "LIVE ●";
     status.style.color = "#ffe000";
-    // Subscribe to region covering Norway and surrounding areas
     lightningWS.send(JSON.stringify({ west: 3, east: 32, north: 72, south: 54 }));
   };
-
   lightningWS.onmessage = (e) => {
     try {
       const d = JSON.parse(e.data);
       if (!d.lat || !d.lon) return;
-      const dist = haversine(LIGHTNING_CENTER.lat, LIGHTNING_CENTER.lon, d.lat, d.lon);
-      if (dist > LIGHTNING_RADIUS_KM) return;
-      lightningStrikes.unshift({ lat: d.lat, lon: d.lon, time: Date.now(), dist: Math.round(dist) });
-      if (lightningStrikes.length > 200) lightningStrikes.pop();
-      document.getElementById("lightning-count").textContent = lightningStrikes.length + " STRIKES (LAST HOUR)";
+      const now = Date.now();
+      // Add marker
+      const icon = L.divIcon({
+        className: "",
+        html: '<div style="width:10px;height:10px;background:#ffe000;border-radius:50%;box-shadow:0 0 8px #ffe000;opacity:0.9"></div>',
+        iconSize: [10, 10], iconAnchor: [5, 5],
+      });
+      const marker = L.marker([d.lat, d.lon], { icon }).addTo(lightningMarkers);
+      lightningStrikes.push({ marker, time: now });
+      document.getElementById("lightning-count").textContent = lightningStrikes.length + " STRIKES";
+      // Fade out old markers
+      setTimeout(() => {
+        try { lightningMarkers.removeLayer(marker); } catch(_) {}
+        lightningStrikes = lightningStrikes.filter(s => s.marker !== marker);
+        document.getElementById("lightning-count").textContent = lightningStrikes.length + " STRIKES";
+      }, 3600000);
     } catch(_) {}
   };
-
   lightningWS.onclose = () => {
     status.textContent = "DISCONNECTED";
     status.style.color = "rgba(255,56,56,.8)";
-    // Reconnect after 5s if modal still open
     if (document.getElementById("lightning-modal").style.display !== "none") {
       setTimeout(connectLightningWS, 5000);
     }
   };
-
-  lightningWS.onerror = () => {
-    status.textContent = "CONNECTION ERROR";
-    status.style.color = "rgba(255,56,56,.8)";
-  };
+  lightningWS.onerror = () => { status.textContent = "ERROR"; };
 }
 
-function drawLightning() {
-  lightningAnimFrame = requestAnimationFrame(drawLightning);
-  if (!lightningCtx || document.getElementById("lightning-modal").style.display === "none") return;
-
-  const W = lightningCanvas.width, H = lightningCanvas.height;
-  const now = Date.now();
-
-// Background with OSM tiles
-  const OSM_ZOOM = 6;
-  function tileXY(lat, lon, zoom) {
-    const n = Math.pow(2, zoom);
-    return {
-      x: Math.floor((lon + 180) / 360 * n),
-      y: Math.floor((1 - Math.log(Math.tan(lat * Math.PI/180) + 1/Math.cos(lat * Math.PI/180)) / Math.PI) / 2 * n),
-    };
-  }
-  function tileBounds(tx, ty, zoom) {
-    const n = Math.pow(2, zoom);
-    const lon1 = tx / n * 360 - 180;
-    const lon2 = (tx + 1) / n * 360 - 180;
-    const lat1 = Math.atan(Math.sinh(Math.PI * (1 - 2 * ty / n))) * 180/Math.PI;
-    const lat2 = Math.atan(Math.sinh(Math.PI * (1 - 2 * (ty+1) / n))) * 180/Math.PI;
-    return { lat1, lat2, lon1, lon2 };
-  }
-  const tileCache = {};
-  function drawOSMTiles() {
-    const W = lightningCanvas.width, H = lightningCanvas.height;
-    const center = tileXY(LIGHTNING_CENTER.lat, LIGHTNING_CENTER.lon, OSM_ZOOM);
-    const range  = 4;
-    for (let dx = -range; dx <= range; dx++) {
-      for (let dy = -range; dy <= range; dy++) {
-        const tx = center.x + dx, ty = center.y + dy;
-        const key = OSM_ZOOM + "/" + tx + "/" + ty;
-        const b   = tileBounds(tx, ty, OSM_ZOOM);
-        const p1  = latlonToXY(b.lat1, b.lon1);
-        const p2  = latlonToXY(b.lat2, b.lon2);
-        const tw  = p2.x - p1.x, th = p2.y - p1.y;
-        if (!tileCache[key]) {
-          const img = new Image();
-          img.crossOrigin = "anonymous";
-          img.src = "https://tile.openstreetmap.org/" + key + ".png";
-          img.onload = () => { tileCache[key] = img; };
-        } else {
-          lightningCtx.globalAlpha = 0.25;
-          lightningCtx.drawImage(tileCache[key], p1.x, p1.y, tw, th);
-          lightningCtx.globalAlpha = 1;
-        }
-      }
-    }
-  }
-
-  // Background
-  lightningCtx.fillStyle = "#000";
-  lightningCtx.fillRect(0, 0, W, H);
-  drawOSMTiles();
-
-  // Grid circles
-  lightningCtx.strokeStyle = "rgba(255,224,0,.06)";
-  lightningCtx.lineWidth = 1;
-  [100, 200, 300].forEach(km => {
-    const r = km / LIGHTNING_RADIUS_KM * Math.min(W, H) / 2;
-    lightningCtx.beginPath();
-    lightningCtx.arc(W/2, H/2, r, 0, Math.PI*2);
-    lightningCtx.stroke();
-    lightningCtx.fillStyle = "rgba(255,224,0,.25)";
-    lightningCtx.font = "9px 'Share Tech Mono', monospace";
-    lightningCtx.fillText(km + "km", W/2 + r + 3, H/2);
-  });
-
-  // Cross hair (Oslo center)
-  lightningCtx.strokeStyle = "rgba(255,224,0,.3)";
-  lightningCtx.beginPath(); lightningCtx.moveTo(W/2-10,H/2); lightningCtx.lineTo(W/2+10,H/2); lightningCtx.stroke();
-  lightningCtx.beginPath(); lightningCtx.moveTo(W/2,H/2-10); lightningCtx.lineTo(W/2,H/2+10); lightningCtx.stroke();
-  lightningCtx.fillStyle = "#ffe000";
-  lightningCtx.font = "9px 'Share Tech Mono', monospace";
-  lightningCtx.fillText("OSLO", W/2 + 6, H/2 - 4);
-
-  // Strikes — fade out over 60 seconds
-  const MAX_AGE = 3600000; // 1 hour
-  lightningStrikes = lightningStrikes.filter(s => now - s.time < MAX_AGE);
-
-  lightningStrikes.forEach(s => {
-    const age   = now - s.time;
-    const alpha = Math.max(0, 1 - age / MAX_AGE);
-    const fresh = age < 2000; // flash for 2 seconds
-    const { x, y } = latlonToXY(s.lat, s.lon);
-
-    if (fresh) {
-      // Bright flash
-      const flashAlpha = 1 - age / 2000;
-      lightningCtx.fillStyle = "rgba(255,255,200," + flashAlpha + ")";
-      lightningCtx.beginPath();
-      lightningCtx.arc(x, y, 6, 0, Math.PI*2);
-      lightningCtx.fill();
-      // Glow
-      const grd = lightningCtx.createRadialGradient(x, y, 0, x, y, 20);
-      grd.addColorStop(0, "rgba(255,255,100," + flashAlpha*0.6 + ")");
-      grd.addColorStop(1, "rgba(255,255,100,0)");
-      lightningCtx.fillStyle = grd;
-      lightningCtx.beginPath();
-      lightningCtx.arc(x, y, 20, 0, Math.PI*2);
-      lightningCtx.fill();
-    } else {
-      // Fading dot
-      lightningCtx.fillStyle = "rgba(255,200,0," + alpha * 0.8 + ")";
-      lightningCtx.beginPath();
-      lightningCtx.arc(x, y, 3, 0, Math.PI*2);
-      lightningCtx.fill();
-    }
-  });
-}
-
-window.addEventListener("resize", resizeLightningCanvas);
-
-// ─── FLIGHT MAP ───────────────────────────────────────────────────────────────
-// Uses OpenSky Network — free, no API key required
-const FLIGHT_CENTER  = { lat: 59.913, lon: 10.752 }; // Oslo
-const FLIGHT_RADIUS  = 2.5; // degrees (~250km)
-let flightCanvas     = null;
-let flightCtx        = null;
-let flightData       = [];
-let flightInterval   = null;
-let flightAnimFrame  = null;
-let flightHover      = null;
+// ─── FLIGHT MAP (Leaflet + OpenSky) ──────────────────────────────────────────
+let flightMap      = null;
+let flightLayer    = null;
+let flightInterval = null;
+let flightMarkerMap = {};
 
 function openFlightModal() {
-  const modal = document.getElementById("flight-modal");
-  modal.style.display = "flex";
-  flightCanvas = document.getElementById("flight-canvas");
-  flightCtx    = flightCanvas.getContext("2d");
-  resizeFlightCanvas();
-  fetchFlights();
-  drawFlights();
-  flightInterval = setInterval(fetchFlights, 10000); // update every 10s
-
-  flightCanvas.addEventListener("mousemove", onFlightHover);
-  flightCanvas.addEventListener("mouseleave", () => {
-    flightHover = null;
-    document.getElementById("flight-tooltip").style.display = "none";
-  });
+  document.getElementById("flight-modal").style.display = "flex";
+  setTimeout(() => {
+    if (!flightMap) {
+      flightMap = L.map("flight-map", { zoomControl: true, attributionControl: false })
+        .setView([59.913, 10.752], 7);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 13, className: "dark-tiles-flight"
+      }).addTo(flightMap);
+      flightLayer = L.layerGroup().addTo(flightMap);
+      const style = document.createElement("style");
+      style.textContent = ".dark-tiles-flight { filter: invert(1) hue-rotate(180deg) brightness(0.35) saturate(0.5); }";
+      document.head.appendChild(style);
+    }
+    flightMap.invalidateSize();
+    fetchFlights();
+    flightInterval = setInterval(fetchFlights, 15000);
+  }, 100);
 }
 
 function closeFlightModal() {
   document.getElementById("flight-modal").style.display = "none";
-  if (flightInterval)   { clearInterval(flightInterval);      flightInterval = null; }
-  if (flightAnimFrame)  { cancelAnimationFrame(flightAnimFrame); flightAnimFrame = null; }
-  flightCanvas?.removeEventListener("mousemove", onFlightHover);
-}
-
-function resizeFlightCanvas() {
-  if (!flightCanvas) return;
-  flightCanvas.width  = flightCanvas.offsetWidth;
-  flightCanvas.height = flightCanvas.offsetHeight;
-}
-
-function flightLatLonToXY(lat, lon) {
-  const W = flightCanvas.width, H = flightCanvas.height;
-  const scale = Math.min(W, H) / (FLIGHT_RADIUS * 2);
-  const x = W/2 + (lon - FLIGHT_CENTER.lon) * scale * Math.cos(FLIGHT_CENTER.lat * Math.PI/180);
-  const y = H/2 - (lat - FLIGHT_CENTER.lat) * scale;
-  return { x, y };
+  if (flightInterval) { clearInterval(flightInterval); flightInterval = null; }
 }
 
 async function fetchFlights() {
   const status = document.getElementById("flight-status");
   try {
-    const bbox = [
-      FLIGHT_CENTER.lat - FLIGHT_RADIUS,
-      FLIGHT_CENTER.lat + FLIGHT_RADIUS,
-      FLIGHT_CENTER.lon - FLIGHT_RADIUS * 1.5,
-      FLIGHT_CENTER.lon + FLIGHT_RADIUS * 1.5,
-    ];
-    const url = "/api/flights?lamin=" + bbox[0] + "&lamax=" + bbox[1] + "&lomin=" + bbox[2] + "&lomax=" + bbox[3];
-    const res  = await fetch(url);
+    const res  = await fetch("/api/flights?lamin=58.5&lamax=61.5&lomin=8.0&lomax=14.5");
     const data = await res.json();
-    if (data.states) {
-      flightData = data.states.filter(s => s[5] && s[6]).map(s => ({
-        icao:      s[0],
-        callsign:  (s[1] || "").trim() || "N/A",
-        country:   s[2] || "",
-        lon:       s[5],
-        lat:       s[6],
-        alt:       s[7] ? Math.round(s[7]) : null,      // metres
-        speed:     s[9] ? Math.round(s[9] * 3.6) : null, // km/h
-        heading:   s[10] || 0,
-        onGround:  s[8],
-      }));
-      document.getElementById("flight-count").textContent = flightData.length + " AIRCRAFT";
-      status.textContent = "LIVE ●";
-      status.style.color = "#00b4ff";
+    if (!data.states) throw new Error("no data");
+
+    const active = new Set();
+    for (const s of data.states) {
+      if (!s[6] || !s[5]) continue;
+      const icao    = s[0];
+      const lat     = s[6], lon = s[5];
+      const call    = (s[1]||"").trim() || icao;
+      const heading = s[10] || 0;
+      const alt     = s[7] ? Math.round(s[7]) + " m" : "ground";
+      const spd     = s[9] ? Math.round(s[9]*3.6) + " km/h" : "";
+      const onGnd   = s[8];
+      active.add(icao);
+
+      const html = '<div style="color:#00b4ff;font-size:16px;transform:rotate(' + heading + 'deg);line-height:1">✈</div>';
+      const icon = L.divIcon({ className: "", html, iconSize: [16,16], iconAnchor: [8,8] });
+
+      const popup = '<div style="font-family:monospace;font-size:11px;background:#000;color:#00b4ff;padding:4px 8px;border:1px solid #00b4ff">' +
+        '<b>' + call + '</b><br>Alt: ' + alt + (spd ? '<br>Speed: ' + spd : '') + '</div>';
+
+      if (flightMarkerMap[icao]) {
+        flightMarkerMap[icao].setLatLng([lat, lon]).setIcon(icon);
+      } else {
+        flightMarkerMap[icao] = L.marker([lat, lon], { icon })
+          .bindPopup(popup, { className: "flight-popup" })
+          .addTo(flightLayer);
+      }
     }
+    // Remove stale markers
+    for (const icao in flightMarkerMap) {
+      if (!active.has(icao)) {
+        flightLayer.removeLayer(flightMarkerMap[icao]);
+        delete flightMarkerMap[icao];
+      }
+    }
+    document.getElementById("flight-count").textContent = active.size + " AIRCRAFT";
+    status.textContent = "LIVE ●";
+    status.style.color = "#00b4ff";
   } catch(e) {
-    status.textContent = "ERROR";
+    status.textContent = "ERROR: " + e.message;
     status.style.color = "rgba(255,56,56,.8)";
   }
 }
 
-function onFlightHover(e) {
-  const rect = flightCanvas.getBoundingClientRect();
-  const mx = e.clientX - rect.left;
-  const my = e.clientY - rect.top;
-  const tooltip = document.getElementById("flight-tooltip");
-  flightHover = null;
 
-  for (const f of flightData) {
-    const { x, y } = flightLatLonToXY(f.lat, f.lon);
-    if (Math.abs(x - mx) < 14 && Math.abs(y - my) < 14) {
-      flightHover = f;
-      tooltip.style.display = "block";
-      tooltip.style.left = (e.clientX + 14) + "px";
-      tooltip.style.top  = (e.clientY - 10) + "px";
-      tooltip.innerHTML  =
-        "<b>" + f.callsign + "</b><br>" +
-        (f.country ? "🌍 " + f.country + "<br>" : "") +
-        (f.alt !== null ? "📏 " + f.alt + " m<br>" : "") +
-        (f.speed !== null ? "💨 " + f.speed + " km/h<br>" : "") +
-        "🧭 " + Math.round(f.heading) + "°" +
-        (f.onGround ? "<br>🛬 On ground" : "");
-      return;
-    }
-  }
-  tooltip.style.display = "none";
-}
-
-function drawFlights() {
-  flightAnimFrame = requestAnimationFrame(drawFlights);
-  if (!flightCtx || document.getElementById("flight-modal").style.display === "none") return;
-
-  const W = flightCanvas.width, H = flightCanvas.height;
-  flightCtx.fillStyle = "#000a14";
-  flightCtx.fillRect(0, 0, W, H);
-
-  // Grid circles
-  [100, 200].forEach(km => {
-    const deg = km / 111;
-    const r   = deg / FLIGHT_RADIUS * Math.min(W, H) / 2;
-    flightCtx.strokeStyle = "rgba(0,180,255,.07)";
-    flightCtx.lineWidth = 1;
-    flightCtx.beginPath();
-    flightCtx.arc(W/2, H/2, r, 0, Math.PI*2);
-    flightCtx.stroke();
-    flightCtx.fillStyle = "rgba(0,180,255,.2)";
-    flightCtx.font = "9px 'Share Tech Mono', monospace";
-    flightCtx.fillText(km + "km", W/2 + r + 3, H/2);
-  });
-
-  // Gardermoen marker
-  const gmo = flightLatLonToXY(60.193, 11.100);
-  flightCtx.fillStyle = "rgba(0,180,255,.5)";
-  flightCtx.font = "9px 'Share Tech Mono', monospace";
-  flightCtx.fillText("✈ OSL", gmo.x + 5, gmo.y);
-  flightCtx.strokeStyle = "rgba(0,180,255,.4)";
-  flightCtx.beginPath(); flightCtx.arc(gmo.x, gmo.y, 4, 0, Math.PI*2); flightCtx.stroke();
-
-  // Oslo center
-  flightCtx.strokeStyle = "rgba(0,180,255,.3)";
-  flightCtx.beginPath(); flightCtx.moveTo(W/2-8,H/2); flightCtx.lineTo(W/2+8,H/2); flightCtx.stroke();
-  flightCtx.beginPath(); flightCtx.moveTo(W/2,H/2-8); flightCtx.lineTo(W/2,H/2+8); flightCtx.stroke();
-
-  // Draw aircraft
-  flightData.forEach(f => {
-    const { x, y } = flightLatLonToXY(f.lat, f.lon);
-    const rad = f.heading * Math.PI / 180;
-    const isHovered = flightHover?.icao === f.icao;
-
-    flightCtx.save();
-    flightCtx.translate(x, y);
-    flightCtx.rotate(rad);
-
-    // Plane icon (simple triangle)
-    flightCtx.fillStyle = f.onGround ? "rgba(0,180,255,.4)" : (isHovered ? "#fff" : "#00b4ff");
-    flightCtx.beginPath();
-    flightCtx.moveTo(0, -8);    // nose
-    flightCtx.lineTo(-5, 6);   // left wing
-    flightCtx.lineTo(0, 3);     // tail center
-    flightCtx.lineTo(5, 6);    // right wing
-    flightCtx.closePath();
-    flightCtx.fill();
-
-    flightCtx.restore();
-
-    // Callsign label
-    if (isHovered || flightData.length < 30) {
-      flightCtx.fillStyle = isHovered ? "#fff" : "rgba(0,180,255,.7)";
-      flightCtx.font = "8px 'Share Tech Mono', monospace";
-      flightCtx.fillText(f.callsign, x + 8, y - 6);
-    }
-  });
-}
-
-window.addEventListener("resize", resizeFlightCanvas);
 
 loadDepartures();
 loadWeather();
