@@ -336,22 +336,25 @@
     <button onclick="openMapModal()" style="
       background:rgba(0,255,65,.08);border:1px solid var(--g3);color:var(--g);
       font-family:'Share Tech Mono',monospace;font-size:10px;padding:5px 14px;
-      cursor:pointer;border-radius:1px;letter-spacing:2px;transition:all .15s;
-      text-shadow:var(--glow);
-    " onmouseover="this.style.background='rgba(0,255,65,.18)';this.style.borderColor='var(--g)'"
-       onmouseout="this.style.background='rgba(0,255,65,.08)';this.style.borderColor='var(--g3)'">
+      cursor:pointer;border-radius:1px;letter-spacing:2px;transition:all .15s"
+      onmouseover="this.style.background='rgba(0,255,65,.18)';this.style.borderColor='var(--g)'"
+      onmouseout="this.style.background='rgba(0,255,65,.08)';this.style.borderColor='var(--g3)'">
       ▣ TRAFFIC MAP
     </button>
     <button onclick="openLightningModal()" style="
       background:rgba(255,224,0,.08);border:1px solid rgba(255,224,0,.4);color:#ffe000;
       font-family:'Share Tech Mono',monospace;font-size:10px;padding:5px 14px;
-      cursor:pointer;border-radius:1px;letter-spacing:2px;transition:all .15s">
+      cursor:pointer;border-radius:1px;letter-spacing:2px;transition:all .15s"
+      onmouseover="this.style.background='rgba(255,224,0,.18)';this.style.borderColor='#ffe000'"
+      onmouseout="this.style.background='rgba(255,224,0,.08)';this.style.borderColor='rgba(255,224,0,.4)'">
       ⚡ LIGHTNING MAP
     </button>
     <button onclick="openFlightModal()" style="
       background:rgba(0,180,255,.08);border:1px solid rgba(0,180,255,.4);color:#00b4ff;
       font-family:'Share Tech Mono',monospace;font-size:10px;padding:5px 14px;
-      cursor:pointer;border-radius:1px;letter-spacing:2px;transition:all .15s">
+      cursor:pointer;border-radius:1px;letter-spacing:2px;transition:all .15s"
+      onmouseover="this.style.background='rgba(0,180,255,.18)';this.style.borderColor='#00b4ff'"
+      onmouseout="this.style.background='rgba(0,180,255,.08)';this.style.borderColor='rgba(0,180,255,.4)'">
       ✈ FLIGHT MAP
     </button>
   </div>
@@ -418,6 +421,27 @@
       </div>
     </div>
     <canvas id="lightning-canvas" style="flex:1;width:100%;cursor:crosshair"></canvas>
+  </div>
+
+  <!-- FLIGHT MAP MODAL -->
+  <div id="flight-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.95);
+    z-index:1000;flex-direction:column">
+    <div style="display:flex;justify-content:space-between;align-items:center;
+      padding:10px 16px;border-bottom:1px solid rgba(0,180,255,.3);background:rgba(0,0,0,.97)">
+      <span style="font-family:'Share Tech Mono',monospace;font-size:12px;color:#00b4ff;letter-spacing:2px">
+        ✈ FLIGHT MAP — OSLO REGION</span>
+      <div style="display:flex;gap:12px;align-items:center">
+        <span id="flight-count" style="font-family:'Share Tech Mono',monospace;font-size:10px;color:#00b4ff">0 AIRCRAFT</span>
+        <span id="flight-status" style="font-family:'Share Tech Mono',monospace;font-size:9px;color:rgba(0,180,255,.5)">LOADING…</span>
+        <button onclick="closeFlightModal()" style="background:rgba(0,180,255,.08);border:1px solid rgba(0,180,255,.3);
+          color:#00b4ff;font-family:'Share Tech Mono',monospace;font-size:10px;padding:4px 12px;
+          cursor:pointer;border-radius:1px;letter-spacing:2px">✕ LUKK</button>
+      </div>
+    </div>
+    <canvas id="flight-canvas" style="flex:1;width:100%;cursor:crosshair"></canvas>
+    <div id="flight-tooltip" style="display:none;position:fixed;background:rgba(0,0,0,.9);
+      border:1px solid rgba(0,180,255,.4);color:#00b4ff;font-family:'Share Tech Mono',monospace;
+      font-size:10px;padding:6px 10px;pointer-events:none;z-index:1001;line-height:1.6"></div>
   </div>
 
   <!-- LEFT COLUMN: cameras → police → incidents (stacked, no gaps) -->
@@ -1551,9 +1575,54 @@ function drawLightning() {
   const W = lightningCanvas.width, H = lightningCanvas.height;
   const now = Date.now();
 
+// Background with OSM tiles
+  const OSM_ZOOM = 6;
+  function tileXY(lat, lon, zoom) {
+    const n = Math.pow(2, zoom);
+    return {
+      x: Math.floor((lon + 180) / 360 * n),
+      y: Math.floor((1 - Math.log(Math.tan(lat * Math.PI/180) + 1/Math.cos(lat * Math.PI/180)) / Math.PI) / 2 * n),
+    };
+  }
+  function tileBounds(tx, ty, zoom) {
+    const n = Math.pow(2, zoom);
+    const lon1 = tx / n * 360 - 180;
+    const lon2 = (tx + 1) / n * 360 - 180;
+    const lat1 = Math.atan(Math.sinh(Math.PI * (1 - 2 * ty / n))) * 180/Math.PI;
+    const lat2 = Math.atan(Math.sinh(Math.PI * (1 - 2 * (ty+1) / n))) * 180/Math.PI;
+    return { lat1, lat2, lon1, lon2 };
+  }
+  const tileCache = {};
+  function drawOSMTiles() {
+    const W = lightningCanvas.width, H = lightningCanvas.height;
+    const center = tileXY(LIGHTNING_CENTER.lat, LIGHTNING_CENTER.lon, OSM_ZOOM);
+    const range  = 4;
+    for (let dx = -range; dx <= range; dx++) {
+      for (let dy = -range; dy <= range; dy++) {
+        const tx = center.x + dx, ty = center.y + dy;
+        const key = OSM_ZOOM + "/" + tx + "/" + ty;
+        const b   = tileBounds(tx, ty, OSM_ZOOM);
+        const p1  = latlonToXY(b.lat1, b.lon1);
+        const p2  = latlonToXY(b.lat2, b.lon2);
+        const tw  = p2.x - p1.x, th = p2.y - p1.y;
+        if (!tileCache[key]) {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.src = "https://tile.openstreetmap.org/" + key + ".png";
+          img.onload = () => { tileCache[key] = img; };
+        } else {
+          lightningCtx.globalAlpha = 0.25;
+          lightningCtx.drawImage(tileCache[key], p1.x, p1.y, tw, th);
+          lightningCtx.globalAlpha = 1;
+        }
+      }
+    }
+  }
+
   // Background
   lightningCtx.fillStyle = "#000";
   lightningCtx.fillRect(0, 0, W, H);
+  drawOSMTiles();
 
   // Grid circles
   lightningCtx.strokeStyle = "rgba(255,224,0,.06)";
