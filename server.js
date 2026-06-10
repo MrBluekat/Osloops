@@ -1035,6 +1035,27 @@ app.get("/roadweather", async (req, res) => {
   }
 });
 
+// ─── OpenSky Network flight data proxy ───────────────────────────────────────
+app.get("/api/flights", async (req, res) => {
+  try {
+    const { lamin, lamax, lomin, lomax } = req.query;
+    const url = "https://opensky-network.org/api/states/all" +
+      "?lamin=" + lamin + "&lamax=" + lamax + "&lomin=" + lomin + "&lomax=" + lomax;
+    const r = await fetch(url, {
+      headers: { "User-Agent": "oslo-ops-center/1.0 (osloops.xyz)" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!r.ok) throw new Error("OpenSky svarte " + r.status);
+    const data = await r.json();
+    console.log("Flights: " + (data.states?.length || 0) + " aircraft");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.json(data);
+  } catch (e) {
+    console.error("Flights error:", e.message);
+    res.status(502).json({ states: [], error: e.message });
+  }
+});
+
 // ─── Health check ─────────────────────────────────────────────────────────────
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
