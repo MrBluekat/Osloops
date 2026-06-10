@@ -1039,12 +1039,20 @@ app.get("/roadweather", async (req, res) => {
 app.get("/api/flights", async (req, res) => {
   try {
     const { lamin, lamax, lomin, lomax } = req.query;
+    // OpenSky anonymous endpoint — no auth needed
     const url = "https://opensky-network.org/api/states/all" +
       "?lamin=" + lamin + "&lamax=" + lamax + "&lomin=" + lomin + "&lomax=" + lomax;
     const r = await fetch(url, {
-      headers: { "User-Agent": "oslo-ops-center/1.0 (osloops.xyz)" },
-      signal: AbortSignal.timeout(8000),
+      headers: {
+        "User-Agent": "oslo-ops-center/1.0 (osloops.xyz)",
+        "Accept": "application/json",
+      },
+      signal: AbortSignal.timeout(20000), // 20 seconds
     });
+    if (r.status === 429) {
+      console.log("Flights: OpenSky rate limited (429)");
+      return res.status(429).json({ states: [], error: "rate limited" });
+    }
     if (!r.ok) throw new Error("OpenSky svarte " + r.status);
     const data = await r.json();
     console.log("Flights: " + (data.states?.length || 0) + " aircraft");

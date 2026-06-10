@@ -1583,8 +1583,17 @@ function closeFlightModal() {
 async function fetchFlights() {
   const status = document.getElementById("flight-status");
   try {
-    const res  = await fetch("/api/flights?lamin=58.5&lamax=61.5&lomin=8.0&lomax=14.5");
-    const data = await res.json();
+    // Try server proxy first, fallback to direct OpenSky
+    let data;
+    try {
+      const res = await fetch("/api/flights?lamin=58.5&lamax=61.5&lomin=8.0&lomax=14.5");
+      data = await res.json();
+    } catch(_) {}
+    if (!data?.states) {
+      // Direct fetch from OpenSky as fallback
+      const res2 = await fetch("https://opensky-network.org/api/states/all?lamin=58.5&lamax=61.5&lomin=8.0&lomax=14.5");
+      data = await res2.json();
+    }
     if (!data.states) throw new Error("no data");
 
     const active = new Set();
