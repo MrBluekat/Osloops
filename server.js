@@ -1039,25 +1039,36 @@ app.get("/roadweather", async (req, res) => {
 app.get("/api/flights", async (req, res) => {
   try {
     const { lamin, lamax, lomin, lomax } = req.query;
-    // OpenSky anonymous endpoint — no auth needed
-    const url = "https://opensky-network.org/api/states/all" +
-      "?lamin=" + lamin + "&lamax=" + lamax + "&lomin=" + lomin + "&lomax=" + lomax;
-    const r = await fetch(url, {
-      headers: {
-        "User-Agent": "oslo-ops-center/1.0 (osloops.xyz)",
-        "Accept": "application/json",
-      },
-      signal: AbortSignal.timeout(20000), // 20 seconds
-    });
-    if (r.status === 429) {
-      console.log("Flights: OpenSky rate limited (429)");
-      return res.status(429).json({ states: [], error: "rate limited" });
-    }
-    if (!r.ok) throw new Error("OpenSky svarte " + r.status);
-    const data = await r.json();
-    console.log("Flights: " + (data.states?.length || 0) + " aircraft");
+
+    // Try OpenSky first
+    try {
+      const r = await fetch(
+        "https://opensky-network.org/api/states/all?lamin=" + lamin + "&lamax=" + lamax + "&lomin=" + lomin + "&lomax=" + lomax,
+        { headers: { "User-Agent": "oslo-ops-center/1.0" }, signal: AbortSignal.timeout(15000) }
+      );
+      if (r.ok) {
+        const data = await r.json();
+        console.log("Flights (OpenSky): " + (data.states?.length || 0) + " aircraft");
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        return res.json(data);
+      }
+    } catch(_) {}
+
+    // Fallback: ADS-B lol (free, no key needed)
+    const r2 = await fetch(
+      "https://api.adsb.lol/v2/lat/59.913/lon/10.752/dist/300",
+      { headers: { "User-Agent": "oslo-ops-center/1.0" }, signal: AbortSignal.timeout(10000) }
+    );
+    if (!r2.ok) throw new Error("ADS-B lol svarte " + r2.status);
+    const d = await r2.json();
+    // Convert to OpenSky format
+    const states = (d.ac || []).map(a => [
+      a.hex, a.flight||a.hex, "", 0, 0, a.lon, a.lat, a.alt_baro||0, false,
+      a.gs ? a.gs/3.6 : 0, a.track||0, 0, null, null, "", false, 0
+    ]);
+    console.log("Flights (ADS-B lol): " + states.length + " aircraft");
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.json(data);
+    res.json({ states });
   } catch (e) {
     console.error("Flights error:", e.message);
     res.status(502).json({ states: [], error: e.message });

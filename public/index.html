@@ -1583,18 +1583,38 @@ function closeFlightModal() {
 async function fetchFlights() {
   const status = document.getElementById("flight-status");
   try {
-    // Try server proxy first, fallback to direct OpenSky
-    let data;
+    let data = null;
+
+    // 1. Try server proxy
     try {
-      const res = await fetch("/api/flights?lamin=58.5&lamax=61.5&lomin=8.0&lomax=14.5");
-      data = await res.json();
+      const r = await fetch("/api/flights?lamin=58.5&lamax=61.5&lomin=8.0&lomax=14.5");
+      if (r.ok) data = await r.json();
     } catch(_) {}
+
+    // 2. Direct OpenSky fallback (bypasses server)
     if (!data?.states) {
-      // Direct fetch from OpenSky as fallback
-      const res2 = await fetch("https://opensky-network.org/api/states/all?lamin=58.5&lamax=61.5&lomin=8.0&lomax=14.5");
-      data = await res2.json();
+      try {
+        const r = await fetch("https://opensky-network.org/api/states/all?lamin=58.5&lamax=61.5&lomin=8.0&lomax=14.5");
+        if (r.ok) data = await r.json();
+      } catch(_) {}
     }
-    if (!data.states) throw new Error("no data");
+
+    // 3. ADS-B Exchange fallback
+    if (!data?.states) {
+      try {
+        const r = await fetch("https://api.adsb.lol/v2/lat/59.913/lon/10.752/dist/300");
+        if (r.ok) {
+          const d = await r.json();
+          // Convert ADS-B lol format to OpenSky format
+          data = { states: (d.ac || []).map(a => [
+            a.hex, a.flight||a.hex, "", 0, 0, a.lon, a.lat, a.alt_baro||0, false,
+            a.gs ? a.gs/3.6 : 0, a.track||0, 0, null, null, "", false, 0
+          ])};
+        }
+      } catch(_) {}
+    }
+
+    if (!data?.states?.length) throw new Error("Ingen flydata tilgjengelig");
 
     const active = new Set();
     for (const s of data.states) {
