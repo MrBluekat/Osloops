@@ -1102,7 +1102,7 @@ wss.on("connection", (clientWS) => {
   });
 
   upstream.on("close", () => clientWS.close());
-  upstream.on("error", (e) => { console.log("Blitzortung upstream error:", e.message); clientWS.close(); });
+  upstream.on("error", (e) => { console.log("Blitzortung upstream error:", e.message, e.code); clientWS.close(); });
 
   clientWS.on("close", () => upstream.close());
   clientWS.on("message", (data) => { if (upstream.readyState === WS.OPEN) upstream.send(data); });
