@@ -4,7 +4,6 @@ import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 import { readFileSync } from "fs";
-import { WebSocketServer, WebSocket as WS } from "ws";
 import { createHash } from "crypto";
 
 dotenv.config();
@@ -1080,34 +1079,6 @@ app.get("/api/flights", async (req, res) => {
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
 
-// ─── Blitzortung WebSocket proxy ─────────────────────────────────────────────
-// Proxies wss://ws1.blitzortung.org:3000 → wss://osloops.xyz/ws/lightning
-// This bypasses Cloudflare's port 3000 block
-const wss = new WebSocketServer({ noServer: true });
-
-wss.on("connection", (clientWS) => {
-  const servers = ["ws1","ws3","ws5","ws7"];
-  const server  = servers[Math.floor(Math.random() * servers.length)];
-  const upstream = new WS("wss://" + server + ".blitzortung.org:3000/");
-
-  upstream.on("open", () => {
-    console.log("Blitzortung proxy connected: " + server);
-    // No subscription needed — server streams data automatically after connect
-  });
-
-  let msgCount = 0;
-  upstream.on("message", (data) => {
-    if (msgCount < 3) { console.log("Blitzortung msg " + msgCount + ":", data.toString().slice(0, 100)); msgCount++; }
-    if (clientWS.readyState === WS.OPEN) clientWS.send(data);
-  });
-
-  upstream.on("close", () => clientWS.close());
-  upstream.on("error", (e) => { console.log("Blitzortung upstream error:", e.message, e.code); clientWS.close(); });
-
-  clientWS.on("close", () => upstream.close());
-  clientWS.on("message", (data) => { if (upstream.readyState === WS.OPEN) upstream.send(data); });
-});
-
 // ─── Catch-all → index.html (injects GM key from env) ───────────────────────
 let _indexHtml = null;
 function getIndex() {
@@ -1118,12 +1089,4 @@ app.get("*", (_req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-const server = app.listen(PORT, () => console.log(`Oslo Ops Center running on http://localhost:${PORT}`));
-
-server.on("upgrade", (req, socket, head) => {
-  if (req.url === "/ws/lightning") {
-    wss.handleUpgrade(req, socket, head, (ws) => wss.emit("connection", ws, req));
-  } else {
-    socket.destroy();
-  }
-});
+app.listen(PORT, () => console.log(`Oslo Ops Center running on http://localhost:${PORT}`));
