@@ -1,7 +1,7 @@
 {
   "name": "oslo-ops-center",
   "version": "1.0.0",
-  "description": "Oslo Ops Center — personal traffic dashboard",
+  "description": "Oslo Ops Center \u2014 personal traffic dashboard",
   "type": "module",
   "main": "server.js",
   "scripts": {
@@ -11,6 +11,7 @@
   "dependencies": {
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^3.3.2",
+    "ws": "^8.18.0"
   }
 }

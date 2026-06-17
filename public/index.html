@@ -414,6 +414,7 @@
         ⚡ LIGHTNING MAP — OSLO REGION</span>
       <div style="display:flex;gap:12px;align-items:center">
         
+        <span id="lightning-count" style="font-family:'Share Tech Mono',monospace;font-size:10px;color:#ffe000">0 STRIKES</span>
         <span id="lightning-status" style="font-family:'Share Tech Mono',monospace;font-size:9px;
           color:rgba(255,224,0,.5)">CONNECTING…</span>
         <button onclick="closeLightningModal()" style="background:rgba(255,224,0,.08);
@@ -421,12 +422,7 @@
           font-size:10px;padding:4px 12px;cursor:pointer;border-radius:1px;letter-spacing:2px">✕ LUKK</button>
       </div>
     </div>
-    <iframe 
-      id="lightning-map"
-      src="https://www.lightningmaps.org/?lang=en"
-      style="flex:1;width:100%;border:none"
-      allowfullscreen>
-    </iframe>
+    <div id="lightning-map" style="flex:1;width:100%"></div>
   </div>
 
   <!-- FLIGHT MAP MODAL -->
@@ -1478,14 +1474,73 @@ async function loadRoadWeather() {
   }
 }
 
-// ─── LIGHTNING MAP (lightningmaps.org iframe) ────────────────────────────────
+// ─── LIGHTNING MAP (Leaflet + Blitzortung via server proxy) ──────────────────
+let lightningMap     = null;
+let lightningWS      = null;
+let lightningMarkers = null;
+let lightningStrikes = [];
+
 function openLightningModal() {
   document.getElementById("lightning-modal").style.display = "flex";
-  document.getElementById("lightning-status").textContent = "LIVE ●";
-  document.getElementById("lightning-status").style.color = "#ffe000";
+  setTimeout(() => {
+    if (!lightningMap) {
+      lightningMap = L.map("lightning-map").setView([59.913, 10.752], 5);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 10, className: "dark-tiles"
+      }).addTo(lightningMap);
+      lightningMarkers = L.layerGroup().addTo(lightningMap);
+    }
+    lightningMap.invalidateSize();
+    connectLightningWS();
+  }, 100);
 }
+
 function closeLightningModal() {
   document.getElementById("lightning-modal").style.display = "none";
+  if (lightningWS) { lightningWS.close(); lightningWS = null; }
+}
+
+function connectLightningWS() {
+  if (lightningWS) { lightningWS.close(); lightningWS = null; }
+  const status = document.getElementById("lightning-status");
+  status.textContent = "CONNECTING…";
+  status.style.color = "rgba(255,224,0,.5)";
+
+  // Connect via our server proxy (port 443, bypasses Cloudflare restriction)
+  const wsUrl = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws/lightning";
+  lightningWS = new WebSocket(wsUrl);
+
+  lightningWS.onopen = () => {
+    status.textContent = "LIVE ●";
+    status.style.color = "#ffe000";
+  };
+  lightningWS.onmessage = (e) => {
+    try {
+      const d = JSON.parse(e.data);
+      if (!d.lat || !d.lon) return;
+      const icon = L.divIcon({
+        className: "",
+        html: '<div style="width:8px;height:8px;background:#ffe000;border-radius:50%;box-shadow:0 0 6px #ffe000"></div>',
+        iconSize: [8,8], iconAnchor: [4,4],
+      });
+      const marker = L.marker([d.lat, d.lon], { icon }).addTo(lightningMarkers);
+      lightningStrikes.push({ marker, time: Date.now() });
+      document.getElementById("lightning-count").textContent = lightningStrikes.length + " STRIKES";
+      setTimeout(() => {
+        try { lightningMarkers.removeLayer(marker); } catch(_) {}
+        lightningStrikes = lightningStrikes.filter(s => s.marker !== marker);
+        document.getElementById("lightning-count").textContent = lightningStrikes.length + " STRIKES";
+      }, 3600000);
+    } catch(_) {}
+  };
+  lightningWS.onclose = () => {
+    status.textContent = "DISCONNECTED";
+    status.style.color = "rgba(255,56,56,.8)";
+    if (document.getElementById("lightning-modal").style.display !== "none") {
+      setTimeout(connectLightningWS, 5000);
+    }
+  };
+  lightningWS.onerror = () => { status.textContent = "ERROR"; };
 }
 
 // ─── FLIGHT MAP (Leaflet + OpenSky) ──────────────────────────────────────────
