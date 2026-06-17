@@ -1092,11 +1092,12 @@ wss.on("connection", (clientWS) => {
 
   upstream.on("open", () => {
     console.log("Blitzortung proxy connected: " + server);
-    // Subscribe to Europe region
-    upstream.send(JSON.stringify({ west: -30, east: 50, north: 75, south: 40 }));
+    // No subscription needed — server streams data automatically after connect
   });
 
+  let msgCount = 0;
   upstream.on("message", (data) => {
+    if (msgCount < 3) { console.log("Blitzortung msg " + msgCount + ":", data.toString().slice(0, 100)); msgCount++; }
     if (clientWS.readyState === WS.OPEN) clientWS.send(data);
   });
 
