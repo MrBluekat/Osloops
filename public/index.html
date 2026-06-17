@@ -510,13 +510,22 @@
     <div class="panel" id="dep-panel">
       <div class="panel-glow"></div>
       <div class="panel-head">
-        <span class="panel-title" id="dep-title">⟳ MAKRELLBEKKEN DEPARTURES</span>
+        <span class="panel-title" id="dep-title">⟳ MAKRELLBEKKEN</span>
         <div class="panel-actions">
           <button class="btn" onclick="loadDepartures()">↻</button>
           <span class="badge badge-green">ENTUR LIVE</span>
         </div>
       </div>
-      <div id="dep-body"><div class="loading"><div class="spinner"></div>FETCHING…</div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--g3)">
+        <div style="padding:4px 8px;font-family:'Share Tech Mono',monospace;font-size:9px;
+          color:var(--g);letter-spacing:1px;border-right:1px solid var(--g3)">▶ DEPARTURES</div>
+        <div style="padding:4px 8px;font-family:'Share Tech Mono',monospace;font-size:9px;
+          color:var(--g);letter-spacing:1px">◀ ARRIVALS</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0">
+        <div id="dep-body" style="border-right:1px solid var(--g3)"><div class="loading"><div class="spinner"></div>FETCHING…</div></div>
+        <div id="arr-body"><div class="loading"><div class="spinner"></div>FETCHING…</div></div>
+      </div>
     </div>
     <div class="panel" id="travel-panel">
       <div class="panel-glow"></div>
@@ -727,54 +736,75 @@ async function getStopId() {
 }
 
 async function loadDepartures() {
-  el("dep-body").innerHTML = '<div class="loading"><div class="spinner"></div>FETCHING LIVE DATA…</div>';
+  el("dep-body").innerHTML = '<div class="loading"><div class="spinner"></div>FETCHING…</div>';
+  el("arr-body").innerHTML = '<div class="loading"><div class="spinner"></div>FETCHING…</div>';
   try {
     const stopId = await getStopId();
-    const query = `{ stopPlace(id:"${stopId}") { name estimatedCalls(timeRange:7200,numberOfDepartures:10) {
-      realtime aimedDepartureTime expectedDepartureTime
-      destinationDisplay{frontText} serviceJourney{line{publicCode transportMode}}
-    }}}`;
+    const query = `{ stopPlace(id:"${stopId}") { name
+      estimatedCalls(timeRange:7200,numberOfDepartures:5) {
+        realtime aimedDepartureTime expectedDepartureTime
+        destinationDisplay{frontText} serviceJourney{line{publicCode transportMode}}
+      }
+      arrivals:estimatedCalls(timeRange:7200,numberOfDepartures:5,omitNonBoarding:false,arrivalDeparture:arrivals) {
+        realtime aimedArrivalTime expectedArrivalTime
+        quay{name} serviceJourney{line{publicCode transportMode}}
+        originAimedDepartureTime
+      }
+    }}`;
     const res = await fetch("https://api.entur.io/journey-planner/v3/graphql", {
       method: "POST",
       headers: { "Content-Type":"application/json", "ET-Client-Name":"oslo-ops-center" },
       body: JSON.stringify({ query })
     });
-    const data = await res.json();
-    const calls = data?.data?.stopPlace?.estimatedCalls;
-    const name  = data?.data?.stopPlace?.name || "Makrellbekken";
-    el("dep-title").textContent = `⟳ ${name.toUpperCase()} DEPARTURES`;
-    if (!calls?.length) {
-      el("dep-body").innerHTML = '<div class="loading" style="color:#ffd700">NO DEPARTURES FOUND</div>';
-      return;
-    }
+    const data  = await res.json();
+    const sp    = data?.data?.stopPlace;
+    const name  = sp?.name || "Makrellbekken";
+    el("dep-title").textContent = `⟳ ${name.toUpperCase()}`;
+
     const modeColor = {metro:"#e8000d",tram:"#005b99",rail:"#5a2d82",bus:"#006b3c"};
     const modeLabel = {metro:"T-bane",tram:"Trikk",rail:"Tog",bus:"Buss"};
     const now = new Date();
-    el("dep-body").innerHTML = calls.map((c,i) => {
-      const dep = new Date(c.expectedDepartureTime || c.aimedDepartureTime);
-      const mn  = Math.round((dep - now) / 60000);
+
+    const renderCall = (c, isArr) => {
+      const time = isArr
+        ? new Date(c.expectedArrivalTime || c.aimedArrivalTime)
+        : new Date(c.expectedDepartureTime || c.aimedDepartureTime);
+      const mn  = Math.round((time - now) / 60000);
       const tc  = mn <= 1 ? "t-now" : mn <= 5 ? "t-soon" : "t-later";
       const txt = mn < 0 ? "AVG" : mn <= 1 ? "NÅ" : `${mn} min`;
-      const clk = dep.toLocaleTimeString("no-NO",{hour:"2-digit",minute:"2-digit",timeZone:"Europe/Oslo"});
+      const clk = time.toLocaleTimeString("no-NO",{hour:"2-digit",minute:"2-digit",timeZone:"Europe/Oslo"});
       const bg  = modeColor[c.serviceJourney?.line?.transportMode] || "#006b3c";
       const code= c.serviceJourney?.line?.publicCode || "?";
       const mode= c.serviceJourney?.line?.transportMode || "bus";
-      const dest= c.destinationDisplay?.frontText || "—";
-      const rt  = c.realtime;
+      const dest= isArr ? (c.quay?.name || "—") : (c.destinationDisplay?.frontText || "—");
       return `<div class="dep-row">
         <div class="line-badge" style="background:${bg};color:#fff">${code}</div>
         <div>
           <div class="dep-dest">${dest}</div>
-          <div class="dep-type">${modeLabel[mode]||mode} · ${rt?"● LIVE":"○ SCHED"}</div>
+          <div class="dep-type">${modeLabel[mode]||mode} · ${c.realtime?"● LIVE":"○ SCHED"}</div>
         </div>
         <div>
           <div class="dep-min ${tc}">${txt}</div>
           <div class="dep-clk">${clk}</div>
         </div>
       </div>`;
-    }).join("");
+    };
+
+    // Departures
+    const deps = sp?.estimatedCalls;
+    el("dep-body").innerHTML = deps?.length
+      ? deps.map(c => renderCall(c, false)).join("")
+      : '<div class="loading" style="color:#ffd700;font-size:10px">NONE</div>';
+
+    // Arrivals
+    const arrs = sp?.arrivals;
+    el("arr-body").innerHTML = arrs?.length
+      ? arrs.map(c => renderCall(c, true)).join("")
+      : '<div class="loading" style="color:#ffd700;font-size:10px">NONE</div>';
+
   } catch(e) {
     el("dep-body").innerHTML = `<div class="loading"><span class="err-text">⚠ ${e.message}</span></div>`;
+    el("arr-body").innerHTML = "";
   }
 }
 
