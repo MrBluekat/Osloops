@@ -1509,29 +1509,33 @@ function connectLightningWS() {
   if (lightningWS) lightningWS.close();
   const status = document.getElementById("lightning-status");
   status.textContent = "CONNECTING…";
-  const servers = ["ws1","ws3","ws5","ws7"];
-  const server  = servers[Math.floor(Math.random() * servers.length)];
-  lightningWS = new WebSocket("wss://" + server + ".blitzortung.org:3000/");
+  status.style.color = "rgba(255,224,0,.5)";
+
+  // Use Blitzortung MQTT over WebSocket (port 443) via public HA bridge
+  // This avoids Cloudflare blocking port 3000
+  lightningWS = new WebSocket("wss://blitzortung.ha.schnatterer.io/");
+
   lightningWS.onopen = () => {
     status.textContent = "LIVE ●";
     status.style.color = "#ffe000";
-    lightningWS.send(JSON.stringify({ west: 3, east: 32, north: 72, south: 54 }));
+    // MQTT CONNECT packet
+    lightningWS.send(JSON.stringify({ type: "subscribe", topic: "blitzortung/1.1/+/+/+" }));
   };
   lightningWS.onmessage = (e) => {
     try {
       const d = JSON.parse(e.data);
-      if (!d.lat || !d.lon) return;
+      const lat = d.lat || d.latitude;
+      const lon = d.lon || d.longitude;
+      if (!lat || !lon) return;
       const now = Date.now();
-      // Add marker
       const icon = L.divIcon({
         className: "",
         html: '<div style="width:10px;height:10px;background:#ffe000;border-radius:50%;box-shadow:0 0 8px #ffe000;opacity:0.9"></div>',
         iconSize: [10, 10], iconAnchor: [5, 5],
       });
-      const marker = L.marker([d.lat, d.lon], { icon }).addTo(lightningMarkers);
+      const marker = L.marker([lat, lon], { icon }).addTo(lightningMarkers);
       lightningStrikes.push({ marker, time: now });
       document.getElementById("lightning-count").textContent = lightningStrikes.length + " STRIKES";
-      // Fade out old markers
       setTimeout(() => {
         try { lightningMarkers.removeLayer(marker); } catch(_) {}
         lightningStrikes = lightningStrikes.filter(s => s.marker !== marker);
