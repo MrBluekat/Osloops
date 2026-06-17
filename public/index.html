@@ -1511,7 +1511,7 @@ function connectLightningWS() {
   status.textContent = "CONNECTING…";
   const servers = ["ws1","ws3","ws5","ws7"];
   const server  = servers[Math.floor(Math.random() * servers.length)];
-  lightningWS = new WebSocket("wss://" + server + ".blitzortung.org/");
+  lightningWS = new WebSocket("wss://" + server + ".blitzortung.org:3000/");
   lightningWS.onopen = () => {
     status.textContent = "LIVE ●";
     status.style.color = "#ffe000";
