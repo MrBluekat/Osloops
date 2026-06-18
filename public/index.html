@@ -359,6 +359,14 @@
       onmouseout="this.style.background='rgba(0,180,255,.08)';this.style.borderColor='rgba(0,180,255,.4)'">
       ✈ FLIGHT MAP
     </button>
+    <button onclick="openNotepad()" style="
+      background:rgba(180,180,180,.08);border:1px solid rgba(180,180,180,.3);color:#ccc;
+      font-family:'Share Tech Mono',monospace;font-size:10px;padding:5px 14px;
+      cursor:pointer;border-radius:1px;letter-spacing:2px;transition:all .15s"
+      onmouseover="this.style.background='rgba(180,180,180,.18)';this.style.borderColor='#ccc'"
+      onmouseout="this.style.background='rgba(180,180,180,.08)';this.style.borderColor='rgba(180,180,180,.3)'">
+      ✎ NOTEPAD
+    </button>
   </div>
   <div class="meta-row">
     <div class="meta-item"><strong class="meta-val" id="clock">--:--:--</strong>LOCAL TIME</div>
@@ -421,6 +429,33 @@
       </div>
     </div>
     <div id="flight-map" style="flex:1;width:100%"></div>
+  </div>
+
+  <!-- NOTEPAD MODAL -->
+  <div id="notepad-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);
+    z-index:1000;align-items:center;justify-content:center">
+    <div style="background:#000e05;border:1px solid var(--g3);width:600px;max-width:90vw;
+      max-height:80vh;display:flex;flex-direction:column;border-radius:2px;
+      box-shadow:0 0 30px rgba(0,255,65,.1)">
+      <div style="display:flex;justify-content:space-between;align-items:center;
+        padding:10px 16px;border-bottom:1px solid var(--g3)">
+        <span style="font-family:'Share Tech Mono',monospace;font-size:12px;
+          color:var(--g);letter-spacing:2px">✎ NOTEPAD</span>
+        <button onclick="closeNotepad()" style="background:rgba(0,255,65,.08);
+          border:1px solid var(--g3);color:var(--g);font-family:'Share Tech Mono',monospace;
+          font-size:10px;padding:4px 12px;cursor:pointer;border-radius:1px;letter-spacing:2px">
+          ✕ LUKK</button>
+      </div>
+      <textarea id="notepad-text" placeholder="Skriv notater her…"
+        style="flex:1;background:transparent;border:none;color:var(--g);
+        font-family:'Share Tech Mono',monospace;font-size:12px;line-height:1.6;
+        padding:16px;resize:none;outline:none;min-height:400px;
+        caret-color:var(--g)"></textarea>
+      <div style="padding:6px 16px;border-top:1px solid var(--g3);
+        font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--g3)">
+        Innhold lagres til du forlater siden
+      </div>
+    </div>
   </div>
 
   <!-- LEFT COLUMN: cameras → police → incidents (stacked, no gaps) -->
@@ -1586,6 +1621,34 @@ async function fetchFlights() {
 }
 
 
+
+// ─── NOTEPAD ──────────────────────────────────────────────────────────────────
+// Stored in sessionStorage — persists while tab is open, cleared on close
+function openNotepad() {
+  const modal = document.getElementById("notepad-modal");
+  modal.style.display = "flex";
+  const ta = document.getElementById("notepad-text");
+  ta.value = sessionStorage.getItem("notepad") || "";
+  ta.focus();
+}
+
+function closeNotepad() {
+  document.getElementById("notepad-modal").style.display = "none";
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const ta = document.getElementById("notepad-text");
+  if (ta) {
+    ta.addEventListener("input", () => {
+      sessionStorage.setItem("notepad", ta.value);
+    });
+  }
+});
+
+// Close notepad on click outside
+document.getElementById("notepad-modal").addEventListener("click", (e) => {
+  if (e.target === document.getElementById("notepad-modal")) closeNotepad();
+});
 
 loadDepartures();
 loadWeather();
