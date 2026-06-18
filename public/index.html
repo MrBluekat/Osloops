@@ -214,7 +214,11 @@
   .cam-section-label{
     font-size:9px;letter-spacing:2px;color:var(--g3);text-transform:uppercase;
     padding:6px 8px 4px;display:flex;align-items:center;gap:6px;
+    cursor:pointer;user-select:none;transition:background .15s;
   }
+  .cam-section-label:hover{background:rgba(0,255,65,.05)}
+  .cam-section-label .collapse-arrow{margin-left:auto;font-size:10px;color:var(--g3);transition:transform .2s}
+  .cam-section-label.collapsed .collapse-arrow{transform:rotate(-90deg)}
   .cam-section-label span{color:var(--g);text-shadow:var(--glow)}
   /* Single unified grid for both live and still — all same size */
   .cam-grid,.cam-grid-live{
@@ -806,7 +810,23 @@ async function loadDepartures() {
 }
 
 
-// ─── MET.NO WEATHER ───────────────────────────────────────────────────────────
+// ─── CAMERA SECTION COLLAPSE ──────────────────────────────────────────────────
+const camCollapsed = { live: false, still: false };
+function toggleCamSection(section) {
+  camCollapsed[section] = !camCollapsed[section];
+  const grid  = document.getElementById("grid-" + section);
+  const label = document.getElementById("label-" + section);
+  if (!grid || !label) return;
+  if (camCollapsed[section]) {
+    grid.style.display = "none";
+    label.classList.add("collapsed");
+  } else {
+    grid.style.display = "";
+    label.classList.remove("collapsed");
+  }
+}
+
+
 async function loadWeather() {
   try {
     const res = await fetch(
@@ -1188,8 +1208,8 @@ function renderCamGridFull(cameras) {
   });
 
   grid.innerHTML =
-    (live.length  ? `<div class="cam-section-label">◉ LIVE VIDEO <span>${live.length} kameraer</span></div><div class="cam-grid-live">${liveHtml}</div>` : "") +
-    (still.length ? `<div class="cam-section-label">◈ STILLBILDER <span>${still.length} kameraer</span></div><div class="cam-grid">${stillHtml}</div>` : "");
+    (live.length  ? `<div class="cam-section-label" onclick="toggleCamSection('live')" id="label-live">◉ LIVE VIDEO <span>${live.length} kameraer</span><span class="collapse-arrow">▾</span></div><div id="grid-live" class="cam-grid-live">${liveHtml}</div>` : "") +
+    (still.length ? `<div class="cam-section-label" onclick="toggleCamSection('still')" id="label-still">◈ STILLBILDER <span>${still.length} kameraer</span><span class="collapse-arrow">▾</span></div><div id="grid-still" class="cam-grid">${stillHtml}</div>` : "");
 
   // Init thumbnail HLS players for live grid
   live.forEach((c, i) => {
