@@ -453,7 +453,7 @@
         caret-color:var(--g)"></textarea>
       <div style="padding:6px 16px;border-top:1px solid var(--g3);
         font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--g3)">
-        Innhold lagres til du forlater siden
+        Innhold lagres til du lukker Oslo Ops Center
       </div>
     </div>
   </div>
@@ -479,38 +479,29 @@
       </div>
       <div id="police-body"><div class="loading"><div class="spinner"></div>FETCHING…</div></div>
     </div>
-    <!-- NYHETER med tabs -->
+    <!-- NYHETER alle 5 side om side -->
     <div class="panel" id="vg-panel">
       <div class="panel-glow"></div>
       <div class="panel-head">
         <span class="panel-title">📰 NEWS</span>
         <div class="panel-actions">
-          <button class="btn" onclick="refreshNews()">↻</button>
+          <button class="btn" onclick="refreshAllNews()">↻</button>
         </div>
       </div>
-      <div style="display:flex;gap:0;border-bottom:1px solid var(--g3);background:var(--g4)">
-        <button id="tab-vg" onclick="switchTab('vg')"
-          style="flex:1;padding:5px 2px;font-family:'Share Tech Mono',monospace;font-size:8px;
-          background:var(--g5);border:none;border-right:1px solid var(--g3);
-          border-bottom:2px solid var(--g);color:var(--g);cursor:pointer;letter-spacing:0px">VG</button>
-        <button id="tab-db" onclick="switchTab('db')"
-          style="flex:1;padding:5px 2px;font-family:'Share Tech Mono',monospace;font-size:8px;
-          background:var(--g4);border:none;border-right:1px solid var(--g3);
-          border-bottom:2px solid transparent;color:var(--g3);cursor:pointer;letter-spacing:0">NRK</button>
-        <button id="tab-tv2" onclick="switchTab('tv2')"
-          style="flex:1;padding:5px 2px;font-family:'Share Tech Mono',monospace;font-size:8px;
-          background:var(--g4);border:none;border-right:1px solid var(--g3);
-          border-bottom:2px solid transparent;color:var(--g3);cursor:pointer;letter-spacing:0">TV 2</button>
-        <button id="tab-na" onclick="switchTab('na')"
-          style="flex:1;padding:5px 2px;font-family:'Share Tech Mono',monospace;font-size:8px;
-          background:var(--g4);border:none;border-right:1px solid var(--g3);
-          border-bottom:2px solid transparent;color:var(--g3);cursor:pointer;letter-spacing:0">E24</button>
-        <button id="tab-ap" onclick="switchTab('ap')"
-          style="flex:1;padding:5px 2px;font-family:'Share Tech Mono',monospace;font-size:8px;
-          background:var(--g4);border:none;
-          border-bottom:2px solid transparent;color:var(--g3);cursor:pointer;letter-spacing:0">AFTENPOSTEN</button>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid var(--g3)">
+        <div style="padding:4px 8px;font-family:'Share Tech Mono',monospace;font-size:9px;color:#ff6b35;border-right:1px solid var(--g3);letter-spacing:1px">VG</div>
+        <div style="padding:4px 8px;font-family:'Share Tech Mono',monospace;font-size:9px;color:#cc0000;border-right:1px solid var(--g3);letter-spacing:1px">NRK</div>
+        <div style="padding:4px 8px;font-family:'Share Tech Mono',monospace;font-size:9px;color:#0077cc;border-right:1px solid var(--g3);letter-spacing:1px">TV 2</div>
+        <div style="padding:4px 8px;font-family:'Share Tech Mono',monospace;font-size:9px;color:#e8a000;border-right:1px solid var(--g3);letter-spacing:1px">E24</div>
+        <div style="padding:4px 8px;font-family:'Share Tech Mono',monospace;font-size:9px;color:#005b99;letter-spacing:1px">AFTENPOSTEN</div>
       </div>
-      <div id="vg-body"><div class="loading"><div class="spinner"></div>HENTER…</div></div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr)">
+        <div id="news-vg"  style="border-right:1px solid var(--g3)"><div class="loading"><div class="spinner"></div></div></div>
+        <div id="news-db"  style="border-right:1px solid var(--g3)"><div class="loading"><div class="spinner"></div></div></div>
+        <div id="news-tv2" style="border-right:1px solid var(--g3)"><div class="loading"><div class="spinner"></div></div></div>
+        <div id="news-na"  style="border-right:1px solid var(--g3)"><div class="loading"><div class="spinner"></div></div></div>
+        <div id="news-ap"><div class="loading"><div class="spinner"></div></div></div>
+      </div>
     </div>
 
     <!-- AMBASSADE-VARSEL -->
@@ -1273,76 +1264,38 @@ async function loadIncidents() {
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
-// ─── NYHETER MED TABS ────────────────────────────────────────────────────────
-let activeTab = "vg";
-const newsCache = { vg: null, db: null, tv2: null, na: null, ap: null };
+// ─── NYHETER — alle 5 kilder side om side ────────────────────────────────────
 const newsEndpoints = {
-  vg:  { url: "/api/vgnyheter",   label: "VG.no",          color: "#ff6b35" },
-  db:  { url: "/api/dagbladet",   label: "NRK.no",          color: "#cc0000" },
-  tv2: { url: "/api/tv2",         label: "TV2.no",          color: "#0077cc" },
-  na:  { url: "/api/nettavisen",  label: "E24.no",          color: "#e8a000" },
-  ap:  { url: "/api/aftenposten", label: "Aftenposten.no",  color: "#005b99" },
+  vg:  { url: "/api/vgnyheter",   elId: "news-vg",  color: "#ff6b35" },
+  db:  { url: "/api/dagbladet",   elId: "news-db",  color: "#cc0000" },
+  tv2: { url: "/api/tv2",         elId: "news-tv2", color: "#0077cc" },
+  na:  { url: "/api/nettavisen",  elId: "news-na",  color: "#e8a000" },
+  ap:  { url: "/api/aftenposten", elId: "news-ap",  color: "#005b99" },
 };
 
-function switchTab(tab) {
-  activeTab = tab;
-  // Update tab styles
-  ["vg","db","tv2","na","ap"].forEach(t => {
-    const btn = el("tab-" + t);
-    if (!btn) return;
-    if (t === tab) {
-      btn.style.background = "var(--g5)";
-      btn.style.borderBottom = "2px solid var(--g)";
-      btn.style.color = "var(--g)";
-    } else {
-      btn.style.background = "var(--g4)";
-      btn.style.borderBottom = "2px solid transparent";
-      btn.style.color = "var(--g3)";
-    }
-  });
-  // Show cached or fetch
-  if (newsCache[tab]) {
-    renderNews(tab, newsCache[tab]);
-  } else {
-    fetchNews(tab);
-  }
-}
-
-async function fetchNews(tab) {
-  el("vg-body").innerHTML = '<div class="loading"><div class="spinner"></div>HENTER…</div>';
+async function fetchOneNews(key) {
+  const e = newsEndpoints[key];
   try {
-    const res  = await fetch(newsEndpoints[tab].url);
+    const res  = await fetch(e.url);
     const data = await res.json();
-    if (!data.ok || !data.items.length) throw new Error(data.error || "Ingen saker");
-    newsCache[tab] = data.items;
-    if (activeTab === tab) renderNews(tab, data.items);
-  } catch(e) {
-    if (activeTab === tab)
-      el("vg-body").innerHTML = '<div class="loading err-text">⚠ ' + e.message + '</div>';
+    if (!data.ok || !data.items.length) throw new Error("Ingen saker");
+    el(e.elId).innerHTML = data.items.slice(0,5).map(item => {
+      const dt  = item.date ? new Date(item.date).toLocaleString("no-NO",
+        {timeZone:"Europe/Oslo",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}) : "";
+      const url = (item.url || "#").replace(/'/g, "%27");
+      return `<div class="pol-item" style="border-left:2px solid ${e.color};background:rgba(0,0,0,.1);cursor:pointer;padding:6px 8px"
+        onclick="window.open('${url}','_blank')">
+        <div class="pol-meta" style="font-size:8px;color:var(--g3)">${dt}</div>
+        <div class="pol-title" style="font-size:10px">${item.title}</div>
+      </div>`;
+    }).join("");
+  } catch(err) {
+    el(e.elId).innerHTML = `<div style="padding:8px;font-size:9px;color:var(--g3)">⚠ ${err.message}</div>`;
   }
 }
 
-function renderNews(tab, items) {
-  const color = newsEndpoints[tab].color;
-  const label = newsEndpoints[tab].label;
-  el("vg-body").innerHTML = items.map(item => {
-    const dt  = item.date ? new Date(item.date).toLocaleString("no-NO",
-      {timeZone:"Europe/Oslo",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}) : "";
-    const url = (item.url || "#").replace(/'/g, "%27");
-    return `<div class="pol-item" style="border-left:2px solid ${color};background:rgba(0,0,0,.15);cursor:pointer"
-      onclick="window.open('${url}','_blank')">
-      <div class="pol-meta"><span>${dt}</span></div>
-      <div class="pol-title">${item.title}</div>
-    </div>`;
-  }).join("") + `<div class="pol-src">Kilde: ${label} · Oppdateres hvert 5. min</div>`;
-}
-
-function loadVG() { fetchNews("vg"); }
-
-function refreshNews() {
-  newsCache[activeTab] = null;
-  fetchNews(activeTab);
-}
+function loadVG() { Object.keys(newsEndpoints).forEach(k => fetchOneNews(k)); }
+function refreshAllNews() { Object.keys(newsEndpoints).forEach(k => fetchOneNews(k)); }
 
 // ─── AMBASSADE-VARSEL ─────────────────────────────────────────────────────────
 let lastAmbCount = 0;
@@ -1655,7 +1608,7 @@ loadWeather();
 loadAirQuality();
 loadRoadWeather();
 loadPolice();
-fetchNews('vg'); fetchNews('db'); fetchNews('tv2'); fetchNews('na'); fetchNews('ap');
+loadVG();
 loadAmbassade();
 loadTravelTimes();
 loadCamerasDatex();
@@ -1667,7 +1620,7 @@ setInterval(loadWeather,     300000);
 setInterval(loadAirQuality,  600000);
 setInterval(loadRoadWeather, 300000);
 setInterval(loadPolice,      300000);
-setInterval(() => { Object.keys(newsCache).forEach(t => { newsCache[t]=null; }); fetchNews(activeTab); }, 300000);
+setInterval(refreshAllNews, 300000);
 setInterval(loadAmbassade,   300000);
 setInterval(loadTravelTimes, 300000);   // DATEX updates every 5 min
 setInterval(loadIncidents,   300000);
