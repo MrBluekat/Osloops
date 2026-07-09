@@ -51,7 +51,7 @@
     background:#000;
     color:var(--g);
     font-family:'Share Tech Mono',monospace;
-    font-size:13px;
+    font-size:1em;
     min-height:100vh;
   }
   /* subtle scanline overlay */
@@ -1359,11 +1359,11 @@ async function loadAmbassade() {
 
 // ─── FONT SIZE CONTROL ────────────────────────────────────────────────────────
 let currentFontSize = parseInt(sessionStorage.getItem("fontSize") || "13");
-document.documentElement.style.setProperty("--fs", currentFontSize + "px");
+document.body.style.fontSize = currentFontSize + "px";
 
 function changeFontSize(dir) {
   currentFontSize = Math.min(20, Math.max(9, currentFontSize + dir));
-  document.documentElement.style.setProperty("--fs", currentFontSize + "px");
+  document.body.style.fontSize = currentFontSize + "px";
   sessionStorage.setItem("fontSize", currentFontSize);
 }
 
